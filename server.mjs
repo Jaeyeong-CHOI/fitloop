@@ -215,7 +215,22 @@ async function createCreative(body) {
 
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {
-    console.error('[fitloop] Gemini error', response.status, summarizeGeminiError(payload))
+    const detail = summarizeGeminiError(payload)
+    console.error('[fitloop] Gemini error', response.status, detail)
+    if (response.status === 429 && /prepayment credits|billing/i.test(detail)) {
+      throw clientError(
+        402,
+        'GEMINI_BILLING_REQUIRED',
+        'Gemini 프로젝트의 결제 크레딧이 부족합니다. AI Studio 결제 설정을 확인해 주세요.',
+      )
+    }
+    if (response.status === 429) {
+      throw clientError(
+        429,
+        'GEMINI_RATE_LIMITED',
+        'Gemini 요청 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.',
+      )
+    }
     throw clientError(502, 'GEMINI_REQUEST_FAILED', 'Gemini 이미지 생성 요청에 실패했습니다.')
   }
 
