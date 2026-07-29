@@ -56,5 +56,5 @@ export const DEMO_PRODUCT: ProductRecord = {
   category: '여성 니트',
   color: '크림 베이지',
   fit: '크롭 핏',
-  imageUrl: null,
+  imageUrl: '/creatives/c01.jpg',
 }

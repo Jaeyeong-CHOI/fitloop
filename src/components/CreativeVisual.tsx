@@ -4,9 +4,9 @@ import { PRODUCT } from '../lib/creatives.ts'
 
 /**
  * 광고 시안 비주얼.
- * /public/creatives/c01.jpg ~ c12.jpg 파일이 존재하면 그 이미지를 우선 사용하고
+ * /public/creatives/c01.jpg ~ c24.jpg 파일이 존재하면 그 이미지를 우선 사용하고
  * (추후 Fliption 실제 생성 이미지로 교체), 없으면 듀오톤 배경 + 실루엣 플레이스홀더를 그린다.
- * 파생 시안(v1~v3)은 부모 시안의 이미지를 공유한다.
+ * 파생 시안(v1~v3)은 c13 이후의 별도 이미지로 이어지고, 없을 때만 부모 이미지를 공유한다.
  */
 
 interface Props {
@@ -76,15 +76,17 @@ function Silhouette({ pose, color }: { pose: Creative['model']['pose']; color: s
 }
 
 export default function CreativeVisual({ creative, size = 'lg', imageUrl, productName = PRODUCT.name }: Props) {
-  const [imgOk, setImgOk] = useState(true)
+  const [sourceIndex, setSourceIndex] = useState(0)
   const [imgLoaded, setImgLoaded] = useState(false)
-  const imgId = creative.parentId ?? creative.id
-  const source = imageUrl || `/creatives/${imgId}.jpg`
+  const staticId = `c${String(creative.index + 1).padStart(2, '0')}`
+  const fallbackId = creative.parentId ?? creative.id
+  const sources = [...new Set([imageUrl, `/creatives/${staticId}.jpg`, `/creatives/${fallbackId}.jpg`].filter(Boolean))] as string[]
+  const source = sources[sourceIndex]
 
   useEffect(() => {
-    setImgOk(true)
+    setSourceIndex(0)
     setImgLoaded(false)
-  }, [source])
+  }, [creative.id, imageUrl])
 
   // 배경 톤 (배경 종류 기반) + 모델별 미세 색조 변화 → 진짜 시안 매트릭스처럼 카드마다 조금씩 다르게
   const mIdx = MODELS.findIndex((m) => m.id === creative.model.id)
@@ -113,12 +115,15 @@ export default function CreativeVisual({ creative, size = 'lg', imageUrl, produc
       </div>
 
       {/* 실제 생성 이미지(/creatives/cXX.jpg)가 있으면 플레이스홀더 위에 우선 표시 */}
-      {imgOk && (
+      {source && (
         <img
           src={source}
           alt=""
-          loading="lazy"
-          onError={() => setImgOk(false)}
+          loading="eager"
+          onError={() => {
+            setImgLoaded(false)
+            setSourceIndex((current) => current + 1)
+          }}
           onLoad={() => setImgLoaded(true)}
           className={
             imgLoaded ? 'absolute inset-0 h-full w-full object-cover' : 'absolute h-0 w-0 opacity-0'

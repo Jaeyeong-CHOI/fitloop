@@ -40,18 +40,20 @@ async function installPresentationLayer() {
       #fitloop-demo-caption {
         position: fixed;
         z-index: 99998;
-        left: 54px;
-        bottom: 42px;
-        max-width: 880px;
-        padding: 17px 25px;
+        left: 50%;
+        bottom: 46px;
+        width: min(1320px, calc(100vw - 120px));
+        padding: 22px 34px;
         border: 1px solid rgba(255,255,255,.2);
         border-radius: 18px;
         color: white;
+        text-align: center;
         background: rgba(3, 7, 18, .88);
         box-shadow: 0 12px 38px rgba(0,0,0,.2);
-        font: 700 28px/1.35 -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif;
+        font: 800 38px/1.35 -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif;
         letter-spacing: -.02em;
         backdrop-filter: blur(12px);
+        transform: translateX(-50%);
         transition: opacity .25s, transform .25s;
         pointer-events: none;
       }
