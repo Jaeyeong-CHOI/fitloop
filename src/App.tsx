@@ -27,6 +27,7 @@ export default function App() {
   const [product, setProduct] = useState<ProductRecord | null>(initialStep > 1 ? DEMO_PRODUCT : null)
   const [health, setHealth] = useState<BackendHealth | null>(null)
   const [generated, setGenerated] = useState<Record<string, GeneratedCreative>>({})
+  const [autoGenerateCreatives, setAutoGenerateCreatives] = useState(false)
   const [notice, setNotice] = useState('')
   const [settings, setSettings] = useState<CampaignSettings>({
     dailyBudget: 20000,
@@ -47,6 +48,16 @@ export default function App() {
 
   const handleGenerated = (creative: GeneratedCreative) => {
     setGenerated((current) => ({ ...current, [creative.creativeId]: creative }))
+  }
+
+  const handleProduct = (nextProduct: ProductRecord) => {
+    setProduct(nextProduct)
+    setGenerated({})
+  }
+
+  const startCreativeGeneration = () => {
+    setAutoGenerateCreatives(true)
+    go(2)
   }
 
   const launchCampaign = async () => {
@@ -101,12 +112,20 @@ export default function App() {
         {step === 1 && (
           <Step1Product
             product={product}
-            onProduct={setProduct}
-            onNext={() => go(2)}
+            onProduct={handleProduct}
+            onNext={startCreativeGeneration}
           />
         )}
         {step === 2 && product && (
-          <Step2Creatives product={product} health={health} generated={generated} onGenerated={handleGenerated} onNext={() => go(3)} />
+          <Step2Creatives
+            product={product}
+            health={health}
+            generated={generated}
+            autoGenerate={autoGenerateCreatives}
+            onAutoGenerateStarted={() => setAutoGenerateCreatives(false)}
+            onGenerated={handleGenerated}
+            onNext={() => go(3)}
+          />
         )}
         {step === 3 && (
           <Step3Campaign settings={settings} onChange={setSettings} onNext={() => void launchCampaign()} />

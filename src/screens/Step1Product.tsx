@@ -214,7 +214,7 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
 
       <div className="mt-8 flex justify-center pb-6">
         <button type="button" disabled={phase !== 'done'} onClick={onNext} className="cursor-pointer rounded-full bg-brand px-8 py-3.5 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:bg-gray-200 disabled:text-faint disabled:shadow-none">
-          착용샷 시안 만들기 →
+          착용샷 시안 24종 만들기 →
         </button>
       </div>
     </div>

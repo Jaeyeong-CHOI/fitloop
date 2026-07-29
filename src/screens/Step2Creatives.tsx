@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import CreativeVisual from '../components/CreativeVisual.tsx'
 import { generateCreative } from '../lib/api.ts'
 import { CREATIVES, type Creative } from '../lib/creatives.ts'
@@ -8,15 +8,27 @@ interface Props {
   product: ProductRecord
   health: BackendHealth | null
   generated: Record<string, GeneratedCreative>
+  autoGenerate: boolean
+  onAutoGenerateStarted: () => void
   onGenerated: (creative: GeneratedCreative) => void
   onNext: () => void
 }
 
-export default function Step2Creatives({ product, health, generated, onGenerated, onNext }: Props) {
+export default function Step2Creatives({
+  product,
+  health,
+  generated,
+  autoGenerate,
+  onAutoGenerateStarted,
+  onGenerated,
+  onNext,
+}: Props) {
   const [revealed, setRevealed] = useState(0)
   const [working, setWorking] = useState<Set<string>>(new Set())
   const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null)
   const [error, setError] = useState('')
+  const autoGenerationStarted = useRef(false)
+  const createAllRef = useRef<() => Promise<void>>(async () => {})
 
   useEffect(() => {
     if (revealed >= CREATIVES.length) return
@@ -66,6 +78,14 @@ export default function Step2Creatives({ product, health, generated, onGenerated
     setBatchProgress(null)
     if (failed) setError(`${failed}개 시안 생성에 실패했습니다. 버튼을 눌러 실패한 시안만 다시 생성해 주세요.`)
   }
+  createAllRef.current = createAll
+
+  useEffect(() => {
+    if (!autoGenerate || !canGenerate || autoGenerationStarted.current) return
+    autoGenerationStarted.current = true
+    onAutoGenerateStarted()
+    void createAllRef.current()
+  }, [autoGenerate, canGenerate, onAutoGenerateStarted])
 
   return (
     <div className="animate-fade-in mx-auto max-w-6xl pt-8 pb-6">
