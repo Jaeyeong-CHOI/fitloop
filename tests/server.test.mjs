@@ -22,7 +22,23 @@ test('health does not expose secrets', async () => {
   assert.equal(response.status, 200)
   assert.equal(body.ok, true)
   assert.equal(body.geminiConfigured, false)
+  assert.equal(body.deployment, 'server')
   assert.equal('apiKey' in body, false)
+})
+
+test('production frontend origin receives CORS headers', async () => {
+  const response = await fetch(`http://127.0.0.1:${port}/api/health`, {
+    headers: { Origin: 'https://fitloop.jaeyeong2026.com' },
+  })
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('access-control-allow-origin'), 'https://fitloop.jaeyeong2026.com')
+})
+
+test('unknown origins are rejected', async () => {
+  const response = await fetch(`http://127.0.0.1:${port}/api/health`, {
+    headers: { Origin: 'https://example.com' },
+  })
+  assert.equal(response.status, 403)
 })
 
 test('generation is disabled without a server key', async () => {

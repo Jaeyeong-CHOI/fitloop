@@ -4,9 +4,9 @@
 소액 분산 집행한 뒤 ③ 성과 좋은 시안은 변형 증식, 나쁜 시안은 자동 오프하며 예산을
 재배분하는 루프를 자동화하는 서비스의 발표용 데모 웹앱입니다.
 
-현재 프로덕션은 GitHub Pages 정적 데모입니다. 상품 이미지는 브라우저 안에서만 미리 보고,
-캠페인 설정은 브라우저 저장소에 보관합니다. 서버 전용 구현도 `server.mjs`에 보존되어 있어
-별도 백엔드에 배포하면 Gemini 이미지 생성과 영속 저장을 다시 활성화할 수 있습니다.
+현재 프로덕션 프론트엔드는 GitHub Pages에서 제공하고, 업로드·캠페인 저장·Gemini 생성 API는
+맥미니의 `fitloop-api.jaeyeong2026.com` 백엔드가 담당합니다. Gemini 키는 macOS Keychain에서
+런타임에만 읽으며 GitHub 저장소나 브라우저 번들에는 포함하지 않습니다.
 **예산 배분 알고리즘(톰슨 샘플링)은 실제로 계산**됩니다. Powered by Fliption Virtual Try-on.
 
 프로덕션: <https://fitloop.jaeyeong2026.com>
@@ -43,9 +43,9 @@ FITLOOP_DAILY_GENERATION_LIMIT=5
 
 ## GitHub Pages 배포
 
-`main` 브랜치에 push하면 `.github/workflows/pages.yml`이 `VITE_STATIC_DEPLOYMENT=true`로
-빌드하고 GitHub Pages에 배포합니다. GitHub Pages에서는 비밀키와 Node 서버를 안전하게
-실행할 수 없으므로 Gemini 생성 API와 서버 저장은 의도적으로 비활성화됩니다.
+`main` 브랜치에 push하면 `.github/workflows/pages.yml`이 GitHub Pages용 프론트엔드를
+빌드하고 배포합니다. 빌드에는 비밀값이 아닌 API 주소만 포함되며, Gemini 키는 맥미니
+Keychain에만 저장됩니다. API가 일시적으로 연결되지 않으면 사용자에게 오류를 표시합니다.
 
 ## 백엔드 API
 

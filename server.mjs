@@ -44,6 +44,11 @@ const server = createServer(async (req, res) => {
   try {
     setSecurityHeaders(res)
     if (!isOriginAllowed(req)) return json(res, 403, { error: 'ORIGIN_NOT_ALLOWED' })
+    setCorsHeaders(req, res)
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204)
+      return res.end()
+    }
 
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
     if (url.pathname.startsWith('/api/')) {
@@ -77,6 +82,7 @@ async function handleApi(req, res, url) {
       geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
       imageModel: IMAGE_MODEL,
       persistence: true,
+      deployment: 'server',
     })
   }
 
@@ -174,7 +180,7 @@ async function createCreative(body) {
   const creativeId = safeId(String(body.creativeId || ''))
   const productId = safeId(String(body.productId || ''))
   if (!creativeId || !productId) {
-    throw clientError(400, 'INVALID_GENERATION_REQUEST', '상품과 소재 ID가 필요합니다.')
+    throw clientError(400, 'INVALID_GENERATION_REQUEST', '상품과 시안 ID가 필요합니다.')
   }
 
   const products = await readStore('products.json')
@@ -459,6 +465,16 @@ function isOriginAllowed(req) {
   const protocol = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim()
   const requestOrigin = `${protocol}://${req.headers.host}`
   return origin === requestOrigin || ALLOWED_ORIGINS.has(origin)
+}
+
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin
+  if (!origin || !isOriginAllowed(req)) return
+  res.setHeader('Access-Control-Allow-Origin', origin)
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Max-Age', '86400')
+  res.setHeader('Vary', 'Origin')
 }
 
 async function readJson(req, maxBytes) {

@@ -11,6 +11,8 @@ interface ApiErrorBody {
 }
 
 const STATIC_DEPLOYMENT = import.meta.env.VITE_STATIC_DEPLOYMENT === 'true'
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+const STATIC_FALLBACK = STATIC_DEPLOYMENT && !API_BASE_URL
 
 function localId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -25,7 +27,7 @@ function persistLocal(key: string, value: unknown) {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -40,8 +42,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body
 }
 
+function absoluteImageUrl<T extends { imageUrl: string | null }>(record: T): T {
+  if (!record.imageUrl || !API_BASE_URL || /^https?:\/\//.test(record.imageUrl)) return record
+  return { ...record, imageUrl: `${API_BASE_URL}${record.imageUrl}` }
+}
+
 export function getHealth(): Promise<BackendHealth> {
-  if (STATIC_DEPLOYMENT) {
+  if (STATIC_FALLBACK) {
     return Promise.resolve({
       ok: true,
       geminiConfigured: false,
@@ -62,7 +69,7 @@ export function saveProduct(input: {
   color?: string
   fit?: string
 }): Promise<ProductRecord> {
-  if (STATIC_DEPLOYMENT) {
+  if (STATIC_FALLBACK) {
     const product: ProductRecord = {
       id: localId('product'),
       name: input.name || (input.sourceUrl ? '가져온 상품 데모' : '업로드한 상품'),
@@ -80,7 +87,7 @@ export function saveProduct(input: {
   return request<ProductRecord>('/api/products', {
     method: 'POST',
     body: JSON.stringify(input),
-  })
+  }).then(absoluteImageUrl)
 }
 
 export function generateCreative(input: {
@@ -91,13 +98,13 @@ export function generateCreative(input: {
   backgroundLabel: string
   copyText: string
 }): Promise<GeneratedCreative> {
-  if (STATIC_DEPLOYMENT) {
+  if (STATIC_FALLBACK) {
     return Promise.reject(new Error('GitHub Pages 정적 버전에서는 Gemini 생성을 사용할 수 없습니다.'))
   }
   return request<GeneratedCreative>('/api/creatives/generate', {
     method: 'POST',
     body: JSON.stringify(input),
-  })
+  }).then(absoluteImageUrl)
 }
 
 export function saveCampaign(input: {
@@ -105,7 +112,7 @@ export function saveCampaign(input: {
   settings: unknown
   generatedCreativeIds: string[]
 }): Promise<CampaignRecord> {
-  if (STATIC_DEPLOYMENT) {
+  if (STATIC_FALLBACK) {
     const campaign: CampaignRecord = {
       id: localId('campaign'),
       productId: input.productId,
