@@ -117,12 +117,19 @@ try {
       body: JSON.stringify({
         id: `generated-${input.creativeId}`,
         creativeId: input.creativeId,
-        imageUrl: pixel,
+        imageUrl: `https://generated.fitloop.test/${input.creativeId}.png`,
         model: 'qa-image-model',
         createdAt: new Date().toISOString(),
       }),
     })
   })
+  await page.route('https://generated.fitloop.test/**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(pixel.split(',')[1], 'base64'),
+    }),
+  )
   await page.route('**/api/campaigns', async (route) => {
     savedCampaign = route.request().postDataJSON()
     await route.fulfill({
@@ -156,7 +163,7 @@ try {
   await page.getByRole('button', { name: /이 시안으로 광고 시작하기/ }).click()
   await page.getByRole('heading', { name: '성과 대시보드' }).waitFor()
   assert.ok(
-    (await page.locator('img[src^="data:image/png"]').count()) > 0,
+    (await page.locator('img[src^="https://generated.fitloop.test/"]').count()) > 0,
     'dashboard should reuse images generated in the creative step',
   )
   assert.equal(savedCampaign.settings.modelIds.length, 4)
