@@ -22,7 +22,7 @@ test('health does not expose secrets', async () => {
   assert.equal(response.status, 200)
   assert.equal(body.ok, true)
   assert.equal(body.geminiConfigured, false)
-  assert.equal(body.generationLimit, null)
+  assert.equal(body.generationLimit, 1000)
   assert.equal(body.deployment, 'server')
   assert.equal('apiKey' in body, false)
 })
