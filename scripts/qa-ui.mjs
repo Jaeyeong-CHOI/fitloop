@@ -9,6 +9,13 @@ await mkdir(outputDir, { recursive: true })
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const errors = []
 
+async function assertNoHorizontalOverflow(page, label) {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  )
+  assert.ok(overflow <= 1, `${label} horizontal overflow: ${overflow}px`)
+}
+
 try {
   for (const viewport of [
     { name: 'desktop', width: 1440, height: 1000 },
@@ -24,21 +31,34 @@ try {
     assert.equal(response?.status(), 200)
     await page.getByRole('heading', { name: /옷 사진 한 장이면/ }).waitFor()
 
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-    assert.ok(overflow <= 1, `${viewport.name} horizontal overflow: ${overflow}px`)
+    await assertNoHorizontalOverflow(page, `${viewport.name} home`)
     await page.screenshot({ path: `${outputDir}/${viewport.name}-home.png`, fullPage: true })
 
     await page.getByRole('button', { name: /샘플 상품으로 둘러보기/ }).click()
     await page.getByText('샘플 상품 준비 완료').waitFor()
-    await page.getByRole('button', { name: /착용샷 시안.*만들기/ }).click()
+    await page.getByRole('button', { name: /예산과 타겟 정하러 가기/ }).click()
+    await page.getByRole('heading', { name: /얼마로, 누구에게/ }).waitFor()
+    await page.waitForTimeout(600)
+    await assertNoHorizontalOverflow(page, `${viewport.name} campaign`)
+    await page.screenshot({ path: `${outputDir}/${viewport.name}-campaign.png`, fullPage: true })
+
+    await page.getByRole('button', { name: /모델 고르러 가기/ }).click()
+    await page.getByRole('heading', { name: /어떤 모델이 입어볼까요/ }).waitFor()
+    await page.getByText('4/4명 선택됨').waitFor()
+    await page.waitForTimeout(600)
+    await assertNoHorizontalOverflow(page, `${viewport.name} models`)
+    await page.screenshot({ path: `${outputDir}/${viewport.name}-models.png`, fullPage: true })
+
+    await page.getByRole('button', { name: /이 모델 4명으로 시안 24종 만들기/ }).click()
     await page.getByRole('heading', { name: /광고 시안/ }).waitFor()
     await page.getByText(/샘플 상품에서는 준비된 데모 이미지/).waitFor()
     await page.waitForTimeout(1_000)
+    await assertNoHorizontalOverflow(page, `${viewport.name} creatives`)
     await page.screenshot({ path: `${outputDir}/${viewport.name}-creatives.png`, fullPage: true })
 
-    await page.getByRole('button', { name: /이 시안으로 집행 설정하기/ }).click()
-    await page.getByRole('button', { name: /광고 시작하기/ }).click()
+    await page.getByRole('button', { name: /이 시안으로 광고 시작하기/ }).click()
     await page.getByRole('heading', { name: '성과 대시보드' }).waitFor()
+    await assertNoHorizontalOverflow(page, `${viewport.name} dashboard`)
     await page.screenshot({ path: `${outputDir}/${viewport.name}-dashboard.png`, fullPage: true })
     await page.close()
   }
@@ -47,6 +67,8 @@ try {
   let activeGenerations = 0
   let completedGenerations = 0
   let maxActiveGenerations = 0
+  const generatedModelLabels = new Set()
+  let savedCampaign = null
   const pixel =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XwLzWQAAAABJRU5ErkJggg=='
 
@@ -83,6 +105,7 @@ try {
   )
   await page.route('**/api/creatives/generate', async (route) => {
     const input = route.request().postDataJSON()
+    generatedModelLabels.add(input.modelLabel)
     activeGenerations++
     maxActiveGenerations = Math.max(maxActiveGenerations, activeGenerations)
     await new Promise((resolve) => setTimeout(resolve, 60))
@@ -100,16 +123,40 @@ try {
       }),
     })
   })
+  await page.route('**/api/campaigns', async (route) => {
+    savedCampaign = route.request().postDataJSON()
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'qa-campaign',
+        productId: savedCampaign.productId,
+        settings: savedCampaign.settings,
+        generatedCreativeIds: savedCampaign.generatedCreativeIds,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      }),
+    })
+  })
 
   await page.goto(baseUrl, { waitUntil: 'networkidle' })
   await page.getByPlaceholder(/상품 URL/).fill('https://example.com/product')
   await page.getByRole('button', { name: '가져오기' }).click()
   await page.getByText(/상품 준비 완료/).waitFor()
-  await page.getByRole('button', { name: /착용샷 시안.*만들기/ }).click()
-  await page.getByRole('button', { name: '남은 0종 AI 생성' }).waitFor({ timeout: 10_000 })
+  await page.getByRole('button', { name: /예산과 타겟 정하러 가기/ }).click()
+  await page.getByRole('button', { name: /모델 고르러 가기/ }).click()
+  await page.getByRole('button', { name: /이 모델 4명으로 시안 24종 만들기/ }).click()
+  await page.getByRole('heading', { name: /병렬 생성/ }).waitFor()
+  assert.ok(await page.locator('[aria-label$="생성 대기 중"]').count())
+  await page.getByRole('button', { name: '24종 생성 완료' }).waitFor({ timeout: 10_000 })
 
   assert.equal(completedGenerations, 24)
   assert.equal(maxActiveGenerations, 4)
+  assert.equal(generatedModelLabels.size, 4)
+  await page.getByRole('button', { name: /이 시안으로 광고 시작하기/ }).click()
+  await page.getByRole('heading', { name: '성과 대시보드' }).waitFor()
+  assert.equal(savedCampaign.settings.modelIds.length, 4)
+  assert.equal(savedCampaign.generatedCreativeIds.length, 24)
   await page.close()
 
   assert.deepEqual(errors, [])

@@ -82,8 +82,8 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
           AI 마케터가 <span className="text-brand">알아서 광고</span>를 돌립니다
         </h1>
         <p className="mx-auto mt-5 max-w-md text-[15px] leading-relaxed break-keep text-sub">
-          상품 이미지를 선택하고 준비된 광고 시안을 조합한 뒤, 성과가 좋은 조합에 예산을
-          자동 배분하는 흐름을 체험할 수 있습니다.
+          입힐 모델을 고르면 가상 피팅으로 착용샷 시안을 만들고, 소액으로 테스트한 뒤 잘 되는
+          조합에만 예산을 키웁니다. 사장님은 결과만 확인하세요.
         </p>
       </div>
 
@@ -214,7 +214,7 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
 
       <div className="mt-8 flex justify-center pb-6">
         <button type="button" disabled={phase !== 'done'} onClick={onNext} className="cursor-pointer rounded-full bg-brand px-8 py-3.5 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:bg-gray-200 disabled:text-faint disabled:shadow-none">
-          착용샷 시안 24종 만들기 →
+          예산과 타겟 정하러 가기 →
         </button>
       </div>
     </div>

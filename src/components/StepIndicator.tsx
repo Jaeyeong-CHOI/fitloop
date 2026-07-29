@@ -1,8 +1,9 @@
 const STEPS = [
   { no: 1, label: '상품' },
-  { no: 2, label: '시안' },
-  { no: 3, label: '집행' },
-  { no: 4, label: '성과' },
+  { no: 2, label: '타겟' },
+  { no: 3, label: '모델' },
+  { no: 4, label: '시안' },
+  { no: 5, label: '성과' },
 ]
 
 interface Props {
@@ -22,7 +23,7 @@ export default function StepIndicator({ current, maxReached, onSelect }: Props) 
           <div key={step.no} className="flex items-center">
             {i > 0 && (
               <div
-                className={`mx-1 h-px w-3 sm:mx-2 sm:w-8 lg:w-14 ${step.no <= current ? 'bg-brand' : 'bg-line'}`}
+                className={`mx-1 h-px w-3 sm:mx-1.5 sm:w-5 lg:w-9 ${step.no <= current ? 'bg-brand' : 'bg-line'}`}
               />
             )}
             <button

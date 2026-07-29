@@ -129,8 +129,11 @@ export default function CreativeVisual({ creative, size = 'lg', imageUrl, produc
       {lg && (
         <>
           <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1">
-            <span className="rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-medium text-ink backdrop-blur">
-              {creative.model.label}
+            <span
+              title={creative.model.label}
+              className="rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-medium text-ink backdrop-blur"
+            >
+              {creative.model.short}
             </span>
             <span className="rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-medium text-ink backdrop-blur">
               {creative.background.label}

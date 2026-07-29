@@ -53,9 +53,10 @@ export default function Step3Campaign({ settings, onChange, onNext }: Props) {
   return (
     <div className="animate-fade-up mx-auto max-w-2xl pt-8 pb-6">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">얼마로 시작해볼까요?</h2>
+        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">얼마로, 누구에게 보여줄까요?</h2>
         <p className="mt-2 text-sm leading-relaxed break-keep text-sub">
-          소액으로 넓게 테스트하고, 잘 되는 시안에만 예산을 몰아주는 게 FitLoop 방식이에요.
+          예산과 광고 타겟을 먼저 정한 뒤, 다음 단계에서 고객이 공감할 가상 모델을 선택합니다.
+          생성된 24종 중 성과가 좋은 조합에 예산을 자동으로 몰아줍니다.
         </p>
       </div>
 
@@ -183,8 +184,8 @@ export default function Step3Campaign({ settings, onChange, onNext }: Props) {
       {/* 요약 + CTA */}
       <div className="mt-8 rounded-card border border-line bg-gray-50/80 px-6 py-5 text-center">
         <p className="text-sm break-keep text-sub">
-          <span className="font-semibold text-ink">{CREATIVES.length}개 시안</span>에 예산을 자동
-          분산합니다 · 시안당 하루 약{' '}
+          다음 단계에서 모델을 고르면 <span className="font-semibold text-ink">{CREATIVES.length}개 시안</span>에
+          예산을 자동 분산합니다 · 시안당 하루 약{' '}
           <span className="font-semibold text-ink">{perCreative.toLocaleString('ko-KR')}원</span>
         </p>
         <p className="mt-1 text-xs text-faint">성과에 따라 배분은 매일 자동으로 달라져요.</p>
@@ -195,7 +196,7 @@ export default function Step3Campaign({ settings, onChange, onNext }: Props) {
           onClick={onNext}
           className="cursor-pointer rounded-full bg-brand px-10 py-4 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep"
         >
-          광고 시작하기
+          모델 고르러 가기 →
         </button>
       </div>
     </div>

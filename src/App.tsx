@@ -3,8 +3,17 @@ import StepIndicator from './components/StepIndicator.tsx'
 import Step1Product from './screens/Step1Product.tsx'
 import Step2Creatives from './screens/Step2Creatives.tsx'
 import Step3Campaign, { type CampaignSettings } from './screens/Step3Campaign.tsx'
+import Step3Models from './screens/Step3Models.tsx'
 import Step4Dashboard from './screens/Step4Dashboard.tsx'
 import { getHealth, saveCampaign } from './lib/api.ts'
+import { applyModelProfiles } from './lib/creatives.ts'
+import {
+  DEFAULT_MODEL_IDS,
+  DEFAULT_SELECTION,
+  MODEL_LIBRARY,
+  slotLabels,
+  type ModelSelection,
+} from './lib/models.ts'
 import { DEMO_PRODUCT, type BackendHealth, type GeneratedCreative, type ProductRecord } from './lib/types.ts'
 
 function Logo() {
@@ -15,11 +24,18 @@ function Logo() {
   )
 }
 
-// 발표 리허설용: ?step=4 처럼 특정 단계로 바로 진입 가능
+// 발표 리허설용: ?step=5 처럼 특정 단계로 바로 진입 가능
 const initialStep = (() => {
   const n = Number(new URLSearchParams(window.location.search).get('step'))
-  return Number.isInteger(n) && n >= 1 && n <= 4 ? n : 1
+  return Number.isInteger(n) && n >= 1 && n <= 5 ? n : 1
 })()
+
+function productGender(product: ProductRecord): '여성' | '남성' | null {
+  const text = `${product.name} ${product.category}`.toLowerCase()
+  if (/남성|남자|맨즈|men'?s/.test(text)) return '남성'
+  if (/여성|여자|우먼|women'?s/.test(text)) return '여성'
+  return null
+}
 
 export default function App() {
   const [step, setStep] = useState(initialStep)
@@ -29,6 +45,8 @@ export default function App() {
   const [generated, setGenerated] = useState<Record<string, GeneratedCreative>>({})
   const [autoGenerateCreatives, setAutoGenerateCreatives] = useState(false)
   const [notice, setNotice] = useState('')
+  const [modelSelection, setModelSelection] = useState<ModelSelection>(DEFAULT_SELECTION)
+  const [modelIds, setModelIds] = useState<string[]>(DEFAULT_MODEL_IDS)
   const [settings, setSettings] = useState<CampaignSettings>({
     dailyBudget: 20000,
     gender: '여성',
@@ -51,13 +69,34 @@ export default function App() {
   }
 
   const handleProduct = (nextProduct: ProductRecord) => {
+    const inferredGender = productGender(nextProduct) || '여성'
     setProduct(nextProduct)
     setGenerated({})
+    setNotice('')
+    setAutoGenerateCreatives(false)
+    const matchingModels = MODEL_LIBRARY.filter((model) => model.gender === inferredGender)
+    setSettings((current) => ({ ...current, gender: inferredGender }))
+    setModelSelection({ ...DEFAULT_SELECTION, genders: [inferredGender] })
+    setModelIds(matchingModels.slice(0, 4).map((model) => model.id))
+  }
+
+  const continueToModels = () => {
+    const genders = settings.gender === '전체' ? ['여성', '남성'] : [settings.gender]
+    const candidates = MODEL_LIBRARY.filter((model) => genders.includes(model.gender))
+    setModelSelection((current) => ({ ...current, genders }))
+    setModelIds((current) => {
+      const candidateIds = new Set(candidates.map((model) => model.id))
+      const kept = current.filter((id) => candidateIds.has(id))
+      return [...new Set([...kept, ...candidates.map((model) => model.id)])].slice(0, 4)
+    })
+    go(3)
   }
 
   const startCreativeGeneration = () => {
+    applyModelProfiles(slotLabels(modelIds))
+    setGenerated({})
     setAutoGenerateCreatives(true)
-    go(2)
+    go(4)
   }
 
   const launchCampaign = async () => {
@@ -65,7 +104,7 @@ export default function App() {
       try {
         const campaign = await saveCampaign({
           productId: product.id,
-          settings,
+          settings: { ...settings, modelIds },
           generatedCreativeIds: Object.values(generated).map((creative) => creative.id),
         })
         setNotice(
@@ -77,7 +116,7 @@ export default function App() {
         setNotice('캠페인 저장은 실패했지만 데모 성과 화면은 계속 볼 수 있습니다.')
       }
     }
-    go(4)
+    go(5)
   }
 
   return (
@@ -113,10 +152,22 @@ export default function App() {
           <Step1Product
             product={product}
             onProduct={handleProduct}
-            onNext={startCreativeGeneration}
+            onNext={() => go(2)}
           />
         )}
         {step === 2 && product && (
+          <Step3Campaign settings={settings} onChange={setSettings} onNext={continueToModels} />
+        )}
+        {step === 3 && product && (
+          <Step3Models
+            selection={modelSelection}
+            onChange={setModelSelection}
+            selectedIds={modelIds}
+            onSelect={setModelIds}
+            onNext={startCreativeGeneration}
+          />
+        )}
+        {step === 4 && product && (
           <Step2Creatives
             product={product}
             health={health}
@@ -124,13 +175,10 @@ export default function App() {
             autoGenerate={autoGenerateCreatives}
             onAutoGenerateStarted={() => setAutoGenerateCreatives(false)}
             onGenerated={handleGenerated}
-            onNext={() => go(3)}
+            onNext={() => void launchCampaign()}
           />
         )}
-        {step === 3 && (
-          <Step3Campaign settings={settings} onChange={setSettings} onNext={() => void launchCampaign()} />
-        )}
-        {step === 4 && (
+        {step === 5 && (
           <>
             {notice && <p className="mx-auto mt-5 max-w-3xl rounded-2xl bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-800">{notice}</p>}
             <Step4Dashboard dailyBudget={settings.dailyBudget} />

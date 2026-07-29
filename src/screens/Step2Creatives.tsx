@@ -107,29 +107,41 @@ export default function Step2Creatives({
     void createAllRef.current()
   }, [autoGenerate, canGenerate, onAutoGenerateStarted])
 
+  const generatedCount = Object.keys(generated).length
+  const allGenerated = generatedCount >= CREATIVES.length
+  const selectedModelCount = new Set(CREATIVES.map((creative) => creative.model.label)).size
+
   return (
     <div className="animate-fade-in mx-auto max-w-6xl pt-8 pb-6">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            광고 시안 <span className="text-brand">24종 전체</span>를 AI로 생성합니다
+            {batchProgress ? (
+              <>착용샷 시안을 <span className="text-brand">병렬 생성</span>하고 있어요</>
+            ) : allGenerated ? (
+              <>AI가 광고 시안 <span className="text-brand">24종</span>을 생성했습니다</>
+            ) : (
+              <>광고 시안 <span className="text-brand">24종 전체</span>를 AI로 생성합니다</>
+            )}
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed break-keep text-sub">
-            모델 4종 × 배경 3종 × 카피 2종을 최대 4개씩 병렬 생성합니다. 완료되는 순서대로
-            모든 카드에 실제 상품을 입힌 이미지가 표시됩니다.
+            {selectedModelCount === 1 ? '선택한 모델의 포즈 4종' : `선택한 모델 ${selectedModelCount}종`} ×
+            배경 3종 × 카피 2종을 최대 4개씩 병렬 생성합니다. 완료되는 순서대로 실제 착용샷이 표시됩니다.
           </p>
         </div>
         <button
           type="button"
           onClick={() => void createAll()}
-          disabled={!canGenerate || batchProgress !== null || working.size > 0}
+          disabled={!canGenerate || batchProgress !== null || working.size > 0 || allGenerated}
           className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-ink px-5 py-3 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-default disabled:bg-gray-200 disabled:text-faint"
         >
           {batchProgress ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : '✦'}
           {batchProgress
             ? `${batchProgress.completed}/${batchProgress.total} 생성 중`
-            : Object.keys(generated).length
-              ? `남은 ${Math.max(0, CREATIVES.length - Object.keys(generated).length)}종 AI 생성`
+            : generatedCount
+              ? allGenerated
+                ? '24종 생성 완료'
+                : `남은 ${Math.max(0, CREATIVES.length - generatedCount)}종 AI 생성`
               : '광고 시안 24종 전체 생성'}
         </button>
       </div>
@@ -156,9 +168,13 @@ export default function Step2Creatives({
               style={{ opacity: index < revealed ? 1 : 0, transform: index < revealed ? 'translateY(0)' : 'translateY(14px)' }}
             >
               <div className="relative aspect-[3/4] overflow-hidden">
-                <div className="h-full transition-transform duration-300 group-hover:scale-[1.02]">
-                  <CreativeVisual creative={creative} size="lg" imageUrl={generatedCreative?.imageUrl} productName={product.name} />
-                </div>
+                {batchProgress && !generatedCreative ? (
+                  <div className="fl-skeleton h-full w-full" aria-label={`${creative.id} 생성 대기 중`} />
+                ) : (
+                  <div className="h-full transition-transform duration-300 group-hover:scale-[1.02]">
+                    <CreativeVisual creative={creative} size="lg" imageUrl={generatedCreative?.imageUrl} productName={product.name} />
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => void createOne(creative)}
@@ -180,7 +196,7 @@ export default function Step2Creatives({
             : '생성된 시안과 캠페인 설정은 서버에 저장됩니다.'}
         </p>
         <button type="button" onClick={onNext} disabled={revealed < CREATIVES.length || batchProgress !== null} className="cursor-pointer rounded-full bg-brand px-8 py-3.5 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:opacity-40">
-          이 시안으로 집행 설정하기 →
+          이 시안으로 광고 시작하기 →
         </button>
       </div>
     </div>

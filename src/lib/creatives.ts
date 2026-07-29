@@ -39,11 +39,20 @@ export interface Creative {
 }
 
 export const MODELS: ModelDef[] = [
-  { id: 'm1', label: '20대 캐주얼', short: '캐주얼', pose: 'casual' },
-  { id: 'm2', label: '20대 스트릿', short: '스트릿', pose: 'street' },
-  { id: 'm3', label: '30대 오피스', short: '오피스', pose: 'office' },
-  { id: 'm4', label: '플러스사이즈', short: '플러스', pose: 'plus' },
+  { id: 'm1', label: '여성·20대·아시아·밝은 톤·슬림', short: '모델1', pose: 'casual' },
+  { id: 'm2', label: '여성·30대·아시아·중간 톤·스탠다드', short: '모델2', pose: 'street' },
+  { id: 'm3', label: '여성·30대·아시아·밝은 톤·플러스사이즈', short: '모델3', pose: 'office' },
+  { id: 'm4', label: '여성·20대·아시아·중간 톤·슬림', short: '모델4', pose: 'plus' },
 ]
+
+export function applyModelProfiles(labels: string[]): void {
+  const oneModel = labels.length > 0 && labels.every((label) => label === labels[0])
+  labels.forEach((label, index) => {
+    if (!MODELS[index]) return
+    MODELS[index].label = label
+    MODELS[index].short = oneModel ? `포즈${index + 1}` : `모델${index + 1}`
+  })
+}
 
 export const BACKGROUNDS: BackgroundDef[] = [
   { id: 'b1', label: '스튜디오', tone: [30, 10, 92] },
