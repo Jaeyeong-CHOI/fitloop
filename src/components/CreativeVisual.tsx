@@ -3,10 +3,10 @@ import { MODELS, BACKGROUNDS, type Creative } from '../lib/creatives.ts'
 import { PRODUCT } from '../lib/creatives.ts'
 
 /**
- * 소재 비주얼.
+ * 광고 시안 비주얼.
  * /public/creatives/c01.jpg ~ c24.jpg 파일이 존재하면 그 이미지를 우선 사용하고
  * (추후 Fliption 실제 생성 이미지로 교체), 없으면 듀오톤 배경 + 실루엣 플레이스홀더를 그린다.
- * 파생 소재(v1~v3)는 부모 소재의 이미지를 공유한다.
+ * 파생 시안(v1~v3)은 부모 시안의 이미지를 공유한다.
  */
 
 interface Props {
@@ -86,7 +86,7 @@ export default function CreativeVisual({ creative, size = 'lg', imageUrl, produc
     setImgLoaded(false)
   }, [source])
 
-  // 배경 톤 (배경 종류 기반) + 모델별 미세 색조 변화 → 진짜 소재 매트릭스처럼 카드마다 조금씩 다르게
+  // 배경 톤 (배경 종류 기반) + 모델별 미세 색조 변화 → 진짜 시안 매트릭스처럼 카드마다 조금씩 다르게
   const mIdx = MODELS.findIndex((m) => m.id === creative.model.id)
   const bIdx = BACKGROUNDS.findIndex((b) => b.id === creative.background.id)
   const [h, s, l] = creative.background.tone

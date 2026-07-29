@@ -1,5 +1,5 @@
 /**
- * 소재 매트릭스 정의: 모델 4종 × 배경 3종 × 카피 2종 = 24개 조합.
+ * 광고 시안 매트릭스 정의: 모델 4종 × 배경 3종 × 카피 2종 = 24개 조합.
  * trueCtr 은 시뮬레이션이 사용하는 "숨은 실제 성과"다 — 소수 승자 구조(0.3%~2.8%).
  */
 
@@ -33,7 +33,7 @@ export interface Creative {
   trueCtr: number
   /** 숨은 실제 CVR (%) */
   trueCvr: number
-  /** 파생 소재인 경우 부모 id */
+  /** 파생 시안인 경우 부모 id */
   parentId?: string
   variantNo?: number
 }
@@ -87,7 +87,7 @@ const CTR_TABLE: number[][][] = [
   ],
 ]
 
-/** CVR은 CTR과 약하게 상관 — 잘 팔리는 소재가 전환도 좋다 */
+/** CVR은 CTR과 약하게 상관 — 잘 팔리는 시안이 전환도 좋다 */
 export function cvrOf(ctr: number): number {
   return 1.4 + 0.28 * ctr
 }

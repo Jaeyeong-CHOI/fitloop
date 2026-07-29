@@ -1,6 +1,6 @@
 const STEPS = [
   { no: 1, label: '상품' },
-  { no: 2, label: '소재' },
+  { no: 2, label: '시안' },
   { no: 3, label: '집행' },
   { no: 4, label: '성과' },
 ]

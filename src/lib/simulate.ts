@@ -2,11 +2,11 @@
  * 7일 광고 집행 시뮬레이션.
  *
  * "시뮬레이션이지만 알고리즘은 실제" — 예산 배분은 진짜 톰슨 샘플링이다:
- *  - 각 소재의 클릭 성과를 Beta(1+클릭, 1+노출-클릭) 사후분포로 유지하고
+ *  - 각 광고 시안의 클릭 성과를 Beta(1+클릭, 1+노출-클릭) 사후분포로 유지하고
  *  - 매일 500회 샘플링 대결로 예산 점유율을 정한다 (탐색 하한 보장)
  *  - Day 3 종료: 관측 CTR 하위 30% 자동 오프
- *  - Day 4~5: 관측 ROAS 상위 소재의 변형 3종씩 증식 (부모 성과를 사전분포로 상속)
- *  - Day 4+: ROAS 기반 판정으로 저성과 소재 추가 오프
+ *  - Day 4~5: 관측 ROAS 상위 시안의 변형 3종씩 증식 (부모 성과를 사전분포로 상속)
+ *  - Day 4+: ROAS 기반 판정으로 저성과 시안 추가 오프
  *
  * 난수는 mulberry32 시드 고정 — 재생할 때마다 같은 스토리가 나온다.
  */
@@ -16,7 +16,7 @@ import { CREATIVES, PRODUCT, cvrOf, shortLabel, type Creative } from './creative
 
 /**
  * 시드 137 — 수만 개 시드 중 데모 스토리 조건(D1 ROAS≈0.8, D7≈2.1, 단조 상승,
- * 베스트 소재 = 스트릿×카페×B 계열)을 예산 1~5만원 전 구간에서 만족하는 시드를
+ * 베스트 시안 = 스트릿×카페×B 계열)을 예산 1~5만원 전 구간에서 만족하는 시드를
  * 스캔해 선정. 알고리즘은 실제, 이야기는 재현 가능.
  */
 export const DEFAULT_SEED = 137
@@ -24,7 +24,7 @@ export const SIM_DAYS = 7
 /** 노출당 단가(원) — CPM 7,000원 */
 const COST_PER_IMPRESSION = 7
 const THOMPSON_DRAWS = 500
-/** 활성 소재당 최소 예산 점유율 = EXPLORE_FLOOR / 활성 수 (탐색 보장) */
+/** 활성 시안당 최소 예산 점유율 = EXPLORE_FLOOR / 활성 수 (탐색 보장) */
 const EXPLORE_FLOOR = 0.3
 /**
  * 클릭 표집 노이즈 감쇠 계수. 하루 수백 노출 규모에서는 순수 이항 표집의 산탄 노이즈가
@@ -34,7 +34,7 @@ const EXPLORE_FLOOR = 0.3
  */
 const CLICK_NOISE_DAMP = 0.55
 /**
- * 광고 피로도(빈도 포화): 한 소재에 예산이 몰릴수록 같은 사람에게 반복 노출되어
+ * 광고 피로도(빈도 포화): 한 시안에 예산이 몰릴수록 같은 사람에게 반복 노출되어
  * 한계 성과가 줄어든다. 효과 CTR = trueCtr × (1 − SAT_COEF × share^SAT_POW).
  * 승자 독식의 폭주를 막는 현실적인 감쇠 장치이자, 밴딧이 스스로 균형점을 찾게 한다.
  */
@@ -43,7 +43,7 @@ const SAT_POW = 0.6
 
 export interface CreativeDayStat {
   id: string
-  /** 이 날짜 기준 존재 여부 (파생 소재는 생성일 이전엔 false) */
+  /** 이 날짜 기준 존재 여부 (파생 시안은 생성일 이전엔 false) */
   exists: boolean
   active: boolean
   isNew: boolean
@@ -72,11 +72,11 @@ export interface DayResult {
   cumConversions: number
   cumRoas: number
   activeCount: number
-  /** 이 날 종료 시점에 오프된 소재 */
+  /** 이 날 종료 시점에 오프된 시안 */
   offIds: string[]
-  /** 이 날 시작 시점에 추가된 변형 소재 */
+  /** 이 날 시작 시점에 추가된 변형 시안 */
   newIds: string[]
-  /** 이 날 변형이 생성된 부모 소재 */
+  /** 이 날 변형이 생성된 부모 시안 */
   variantParents: string[]
   events: string[]
 }
@@ -138,7 +138,7 @@ function obsRoas(s: CreativeState): number {
   return s.cumSpend > 0 ? s.cumRevenue / s.cumSpend : 0
 }
 
-/** 톰슨 샘플링 예산 점유율 — 활성 소재끼리 사후분포 샘플 대결 */
+/** 톰슨 샘플링 예산 점유율 — 활성 시안끼리 사후분포 샘플 대결 */
 function thompsonShares(rng: Rng, actives: CreativeState[]): Map<string, number> {
   const wins = new Map<string, number>(actives.map((s) => [s.cr.id, 0]))
   for (let d = 0; d < THOMPSON_DRAWS; d++) {
@@ -204,7 +204,7 @@ export function runSimulation(dailyBudget: number, seed: number = DEFAULT_SEED):
     const newIds: string[] = []
     const dayVariantParents: string[] = []
 
-    // ── Day 4~5 시작: 관측 ROAS 상위 소재 변형 증식 ──
+    // ── Day 4~5 시작: 관측 ROAS 상위 시안 변형 증식 ──
     if (day === 4 || day === 5) {
       const ranked = states
         .filter((s) => s.active && !s.cr.parentId && s.cumSpend > 0)
@@ -220,7 +220,7 @@ export function runSimulation(dailyBudget: number, seed: number = DEFAULT_SEED):
           states.push(v)
           newIds.push(v.cr.id)
         }
-        events.push(`베스트 소재 「${shortLabel(parent.cr)}」의 변형 3종을 생성해 테스트 시작`)
+        events.push(`베스트 시안 「${shortLabel(parent.cr)}」의 변형 3종을 생성해 테스트 시작`)
       }
     }
 
@@ -229,7 +229,7 @@ export function runSimulation(dailyBudget: number, seed: number = DEFAULT_SEED):
     let shares: Map<string, number>
     if (day === 1) {
       shares = new Map(actives.map((s) => [s.cr.id, 1 / actives.length]))
-      events.push(`소재 ${actives.length}종에 예산 균등 분산 — 탐색 시작`)
+      events.push(`시안 ${actives.length}종에 예산 균등 분산 — 탐색 시작`)
     } else {
       shares = thompsonShares(rng, actives)
     }
@@ -241,7 +241,7 @@ export function runSimulation(dailyBudget: number, seed: number = DEFAULT_SEED):
       const share = shares.get(s.cr.id) ?? 0
       const spend = dailyBudget * share
       const impressions = Math.round(spend / COST_PER_IMPRESSION)
-      // 광고 피로도: 예산이 몰린 소재는 효과 CTR이 깎인다
+      // 광고 피로도: 예산이 몰린 시안은 효과 CTR이 깎인다
       const fatigue = 1 - SAT_COEF * Math.pow(share, SAT_POW)
       const effCtr = (s.cr.trueCtr / 100) * fatigue
       // 클릭은 확률 표집(감쇠된 이항 근사) — 톰슨 샘플링의 사후분포를 갱신하는 관측치
@@ -322,7 +322,7 @@ export function runSimulation(dailyBudget: number, seed: number = DEFAULT_SEED):
     const dayRoas = daySpend > 0 ? dayRevenue / daySpend : 0
     const activeCount = states.filter((s) => s.active).length
     if (day >= 2 && offIds.length === 0 && newIds.length === 0) {
-      events.push('톰슨 샘플링으로 성과 좋은 소재에 예산 재배분')
+      events.push('톰슨 샘플링으로 성과 좋은 시안에 예산 재배분')
     }
 
     days.push({

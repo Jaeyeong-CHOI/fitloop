@@ -156,7 +156,7 @@ function RoasChart({ sim, day }: { sim: SimResult; day: number }) {
   )
 }
 
-// ── 소재별 예산 배분 바 ────────────────────────────────────────────────────────
+// ── 시안별 예산 배분 바 ────────────────────────────────────────────────────────
 function BudgetBars({
   sim,
   dayResult,
@@ -166,7 +166,7 @@ function BudgetBars({
   dayResult: DayResult
   maxShare: number
 }) {
-  // 파생 소재를 부모 바로 뒤에 배치 — 가족 단위로 예산이 몰리는 게 한눈에 보이게
+  // 파생 시안을 부모 바로 뒤에 배치 — 가족 단위로 예산이 몰리는 게 한눈에 보이게
   const ordered = useMemo(() => {
     const originals = sim.creatives.filter((c) => !c.parentId)
     return originals.flatMap((o) => [o, ...sim.creatives.filter((c) => c.parentId === o.id)])
@@ -211,7 +211,7 @@ function BudgetBars({
   )
 }
 
-// ── 소재 그리드 미니뷰 ─────────────────────────────────────────────────────────
+// ── 시안 그리드 미니뷰 ─────────────────────────────────────────────────────────
 function MiniGrid({
   sim,
   day,
@@ -299,14 +299,14 @@ function WeeklyReport({ sim }: { sim: SimResult }) {
           <div className="aspect-[3/4] overflow-hidden rounded-2xl border border-brand-mid shadow-soft">
             <CreativeVisual creative={best} size="sm" />
           </div>
-          <p className="mt-2 text-center text-[11px] font-medium text-brand-deep">베스트 소재</p>
+          <p className="mt-2 text-center text-[11px] font-medium text-brand-deep">베스트 시안</p>
         </div>
         <div className="min-w-0 flex-1 space-y-3 text-sm leading-relaxed break-keep">
           <p>
-            <span className="font-bold text-ink">베스트 소재: {bestName}</span>
+            <span className="font-bold text-ink">베스트 시안: {bestName}</span>
             <span className="text-sub">
               {' '}
-              — 소재 ROAS <span className="font-semibold text-ink">
+              — 시안 ROAS <span className="font-semibold text-ink">
                 {bestStat.obsRoas.toFixed(1)}x
               </span>
               . 다음 사입 때 <span className="font-semibold text-ink">{best.model.short} 무드</span>
@@ -318,8 +318,8 @@ function WeeklyReport({ sim }: { sim: SimResult }) {
             먹혔어요. 배경은 {best.background.label} 컷 반응이 가장 좋았습니다.
           </p>
           <p className="text-sub">
-            성과 낮은 소재 <span className="font-medium text-ink">{offCount}종</span>은 자동으로
-            꺼서 예산 낭비를 막았고, 잘 되는 소재의 변형{' '}
+            성과 낮은 시안 <span className="font-medium text-ink">{offCount}종</span>은 자동으로
+            꺼서 예산 낭비를 막았고, 잘 되는 시안의 변형{' '}
             <span className="font-medium text-ink">{variantCount}종</span>을 새로 만들어
             테스트했어요.
           </p>
@@ -501,7 +501,7 @@ export default function Step4Dashboard({ dailyBudget }: Props) {
           deltaGood={roasDelta !== null && roasDelta >= 0}
         />
         <StatTile
-          label="활성 소재"
+          label="활성 시안"
           value={String(dayResult.activeCount)}
           unit="종"
           delta={
@@ -527,7 +527,7 @@ export default function Step4Dashboard({ dailyBudget }: Props) {
         </section>
         <section className="rounded-card border border-line bg-white p-5 shadow-soft lg:col-span-3">
           <div className="flex items-baseline justify-between">
-            <h3 className="text-sm font-semibold">소재별 예산 배분</h3>
+            <h3 className="text-sm font-semibold">시안별 예산 배분</h3>
             <span className="text-xs text-faint">톰슨 샘플링 · 매일 자동 재배분</span>
           </div>
           <div className="mt-4 max-h-[360px] overflow-y-auto pr-1">
@@ -536,10 +536,10 @@ export default function Step4Dashboard({ dailyBudget }: Props) {
         </section>
       </div>
 
-      {/* 소재 미니뷰 */}
+      {/* 시안 미니뷰 */}
       <section className="mb-4 rounded-card border border-line bg-white p-5 shadow-soft">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold">소재 현황</h3>
+          <h3 className="text-sm font-semibold">시안 현황</h3>
           <div className="flex items-center gap-4 text-[11px] text-faint">
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full border-2 border-brand bg-white" /> 오늘의 1위

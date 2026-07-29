@@ -64,7 +64,7 @@ export default function Step2Creatives({ product, health, generated, onGenerated
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            소재 조합 <span className="text-brand">24종</span>을 준비했습니다
+            광고 시안 <span className="text-brand">24종</span>을 준비했습니다
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed break-keep text-sub">
             모델 4종 × 배경 3종 × 카피 2종을 테스트합니다. 각 카드의 AI 생성 버튼으로 실제
@@ -78,7 +78,7 @@ export default function Step2Creatives({ product, health, generated, onGenerated
           className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-ink px-5 py-3 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-default disabled:bg-gray-200 disabled:text-faint"
         >
           {working.size > 0 ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : '✦'}
-          대표 소재 4종 AI 생성
+          대표 시안 4종 AI 생성
         </button>
       </div>
 
@@ -87,8 +87,8 @@ export default function Step2Creatives({ product, health, generated, onGenerated
           {product.id === 'demo'
             ? '샘플 상품에서는 준비된 데모 이미지를 사용합니다. 실제 이미지를 업로드하면 Gemini 생성을 사용할 수 있어요.'
             : health?.deployment === 'static'
-              ? 'GitHub Pages 정적 데모에서는 비밀키를 안전하게 보관할 수 없어 준비된 소재를 사용합니다.'
-              : 'Gemini API 키가 서버에 설정되면 실제 이미지 생성 버튼이 활성화됩니다. 현재는 준비된 데모 소재로 전체 흐름을 볼 수 있어요.'}
+              ? 'GitHub Pages 정적 데모에서는 비밀키를 안전하게 보관할 수 없어 준비된 광고 시안을 사용합니다.'
+              : 'Gemini API 키가 서버에 설정되면 실제 이미지 생성 버튼이 활성화됩니다. 현재는 준비된 데모 시안으로 전체 흐름을 볼 수 있어요.'}
         </div>
       )}
       {error && <p role="alert" className="mb-6 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
@@ -125,10 +125,10 @@ export default function Step2Creatives({ product, health, generated, onGenerated
         <p className="text-xs text-faint">
           {health?.deployment === 'static'
             ? '캠페인 설정은 이 브라우저에만 임시 저장됩니다.'
-            : '생성된 소재와 캠페인 설정은 서버에 저장됩니다.'}
+            : '생성된 시안과 캠페인 설정은 서버에 저장됩니다.'}
         </p>
         <button type="button" onClick={onNext} disabled={revealed < CREATIVES.length} className="cursor-pointer rounded-full bg-brand px-8 py-3.5 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:opacity-40">
-          이 소재로 집행 설정하기 →
+          이 시안으로 집행 설정하기 →
         </button>
       </div>
     </div>

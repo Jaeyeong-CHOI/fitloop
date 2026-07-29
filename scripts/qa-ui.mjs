@@ -30,12 +30,12 @@ try {
 
     await page.getByRole('button', { name: /샘플 상품으로 둘러보기/ }).click()
     await page.getByText('샘플 상품 준비 완료').waitFor()
-    await page.getByRole('button', { name: /착용샷 소재 만들기/ }).click()
-    await page.getByRole('heading', { name: /소재 조합/ }).waitFor()
+    await page.getByRole('button', { name: /착용샷 시안 만들기/ }).click()
+    await page.getByRole('heading', { name: /광고 시안/ }).waitFor()
     await page.getByText(/샘플 상품에서는 준비된 데모 이미지/).waitFor()
     await page.screenshot({ path: `${outputDir}/${viewport.name}-creatives.png`, fullPage: true })
 
-    await page.getByRole('button', { name: /이 소재로 집행 설정하기/ }).click()
+    await page.getByRole('button', { name: /이 시안으로 집행 설정하기/ }).click()
     await page.getByRole('button', { name: /광고 시작하기/ }).click()
     await page.getByRole('heading', { name: '성과 대시보드' }).waitFor()
     await page.screenshot({ path: `${outputDir}/${viewport.name}-dashboard.png`, fullPage: true })
