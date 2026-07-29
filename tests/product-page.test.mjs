@@ -64,3 +64,23 @@ test('removes duplicate and unsafe image candidates', () => {
 test('decodes numeric HTML entities', () => {
   assert.equal(decodeHtmlEntities('A&#38;B &#x1F9E5;'), 'A&B 🧥')
 })
+
+test('extracts images and title embedded in dynamic storefront scripts', () => {
+  const html = `
+    <script>
+      window.__PRODUCT__ = {
+        "productName":"라이트 재킷",
+        "representativeImageUrl":"https:\\/\\/cdn.example.com\\/products\\/jacket.jpg?width=1200\\u0026quality=90"
+      }
+    </script>`
+  const candidates = extractProductImageCandidates(html, 'https://shop.example.com/product/7')
+  assert.equal(candidates[0].url, 'https://cdn.example.com/products/jacket.jpg?width=1200&quality=90')
+  assert.equal(candidates[0].source, 'script:image')
+  assert.equal(extractProductTitle(html), '라이트 재킷')
+})
+
+test('extracts product-like CSS background images', () => {
+  const html = `<div class="product-main" style="background-image:url('/assets/item.png')"></div>`
+  const candidates = extractProductImageCandidates(html, 'https://shop.example.com/products/1')
+  assert.deepEqual(candidates, [{ url: 'https://shop.example.com/assets/item.png', source: 'style:product' }])
+})

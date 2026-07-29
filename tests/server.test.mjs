@@ -63,6 +63,18 @@ test('private URL imports are blocked', async () => {
   assert.equal(body.error, 'PRIVATE_URL_BLOCKED')
 })
 
+test('Coupang imports explain that official Partners credentials are required', async () => {
+  const response = await fetch(`http://127.0.0.1:${port}/api/products`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sourceUrl: 'https://www.coupang.com/vp/products/9528995387' }),
+  })
+  const payload = await response.json()
+  assert.equal(response.status, 503)
+  assert.equal(payload.error, 'COUPANG_PARTNERS_NOT_CONFIGURED')
+  assert.match(payload.message, /쿠팡 파트너스 API 키/)
+})
+
 async function waitForHealth() {
   const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {

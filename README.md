@@ -37,6 +37,8 @@ npm run qa:ui
 GEMINI_API_KEY=...
 GEMINI_IMAGE_MODEL=gemini-3.1-flash-image
 FITLOOP_DAILY_GENERATION_LIMIT=5
+COUPANG_PARTNERS_ACCESS_KEY=...
+COUPANG_PARTNERS_SECRET_KEY=...
 ```
 
 키가 없을 때는 업로드·캠페인 저장·데모 흐름은 정상 동작하고, Gemini 생성 버튼만 비활성화됩니다.
@@ -56,6 +58,13 @@ Keychain에만 저장됩니다. API가 일시적으로 연결되지 않으면 �
 스크립트는 키를 `fitloop-gemini-api-key`라는 macOS Keychain 항목으로 저장하고 API 서비스를
 재시작합니다. 공개된 적이 있는 키는 먼저 Google AI Studio에서 폐기한 뒤 새 키를 사용합니다.
 
+쿠팡 링크 지원은 쿠팡의 서버 자동 접근 차단 때문에 공식 파트너스 API를 사용합니다. 파트너스에서
+발급한 Access Key와 Secret Key는 채팅에 올리지 말고 맥미니에서 아래 스크립트로 저장합니다.
+
+```bash
+./scripts/install-coupang-keys.sh
+```
+
 ## 백엔드 API
 
 - `GET /api/health` — 서버 및 Gemini 설정 상태
@@ -64,8 +73,9 @@ Keychain에만 저장됩니다. API가 일시적으로 연결되지 않으면 �
 - `POST /api/campaigns` — 캠페인 설정과 생성 시안 연결
 
 저장 데이터는 `data/` 아래에 기록되며 Git에는 포함되지 않습니다. 구매 페이지 URL을 넣으면
-Open Graph, Product JSON-LD, Twitter Card, 대표/지연 로딩 이미지 순으로 후보를 찾아 첫 번째
-유효한 JPG·PNG·WebP 이미지를 저장합니다. 모든 리다이렉트 단계에서 사설 IP 접근을 다시
+Open Graph, Product JSON-LD, Twitter Card, 동적 스크립트, 대표/지연 로딩 이미지, CSS 배경
+순으로 후보를 찾아 첫 번째 유효한 JPG·PNG·WebP 이미지를 저장합니다. 쿠팡 상품 및 단축 링크는
+공식 파트너스 API 검색 결과에서 URL의 상품 번호와 정확히 일치하는 상품만 선택합니다. 모든 리다이렉트 단계에서 사설 IP 접근을 다시
 차단하고, 업로드 및 원격 이미지는 8MB로 제한합니다. 로그인·캡차가 필요하거나 브라우저에서
 자바스크립트를 실행해야만 이미지가 나타나는 쇼핑몰은 가져오기가 제한될 수 있습니다.
 

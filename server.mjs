@@ -5,6 +5,12 @@ import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { extractProductImageCandidates, extractProductTitle } from './lib/product-page.mjs'
+import {
+  createCoupangAuthorization,
+  extractCoupangProductId,
+  isCoupangUrl,
+  selectCoupangProduct,
+} from './lib/coupang-partners.mjs'
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url))
 const DIST_DIR = join(ROOT, 'dist')
@@ -18,6 +24,7 @@ await Promise.all([mkdir(UPLOAD_DIR, { recursive: true }), mkdir(GENERATED_DIR, 
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image'
 const GENERATION_LIMIT = clampInt(process.env.FITLOOP_DAILY_GENERATION_LIMIT, 1, 50, 5)
+const METADATA_FALLBACK_URL = process.env.FITLOOP_METADATA_FALLBACK_URL || ''
 const ALLOWED_ORIGINS = new Set(
   (process.env.FITLOOP_ALLOWED_ORIGINS ||
     'https://fitloop.jaeyeong2026.com,http://127.0.0.1:5173,http://localhost:5173')
@@ -67,7 +74,7 @@ const server = createServer(async (req, res) => {
     if (status >= 500) console.error('[fitloop]', error)
     return json(res, status, {
       error: error?.code || 'INTERNAL_ERROR',
-      message: status >= 500 ? '서버 처리 중 오류가 발생했습니다.' : error.message,
+      message: status >= 500 && !error?.code ? '서버 처리 중 오류가 발생했습니다.' : error.message,
     })
   }
 })
@@ -81,6 +88,9 @@ async function handleApi(req, res, url) {
     return json(res, 200, {
       ok: true,
       geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+      coupangConfigured: Boolean(
+        process.env.COUPANG_PARTNERS_ACCESS_KEY && process.env.COUPANG_PARTNERS_SECRET_KEY,
+      ),
       imageModel: IMAGE_MODEL,
       persistence: true,
       deployment: 'server',
@@ -280,7 +290,13 @@ async function importImageFromUrl(rawUrl) {
       'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.7',
     },
   })
-  if (!response.ok) throw clientError(422, 'SOURCE_FETCH_FAILED', '상품 URL을 불러오지 못했습니다.')
+  if (!response.ok) {
+    const finalUrl = response.url || pageUrl.toString()
+    if (isCoupangUrl(finalUrl) || isCoupangUrl(pageUrl)) return importCoupangProduct(finalUrl)
+    const fallback = await importViaMetadataService(pageUrl)
+    if (fallback) return fallback
+    throw clientError(422, 'SOURCE_FETCH_FAILED', '상품 URL을 불러오지 못했습니다.')
+  }
 
   const contentType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase()
   if (contentType.startsWith('image/')) {
@@ -308,7 +324,92 @@ async function importImageFromUrl(rawUrl) {
       if (error?.code === 'REMOTE_FILE_TOO_LARGE') throw error
     }
   }
+  if (isCoupangUrl(finalPageUrl)) return importCoupangProduct(finalPageUrl)
+  const fallback = await importViaMetadataService(finalPageUrl)
+  if (fallback) return fallback
   throw clientError(422, 'PRODUCT_IMAGE_NOT_FOUND', '상품 페이지에서 사용할 수 있는 대표 이미지를 찾지 못했습니다.')
+}
+
+async function importCoupangProduct(rawUrl) {
+  const productId = extractCoupangProductId(rawUrl)
+  if (!productId) {
+    throw clientError(422, 'COUPANG_PRODUCT_ID_NOT_FOUND', '쿠팡 상품 번호를 URL에서 확인하지 못했습니다.')
+  }
+
+  const accessKey = process.env.COUPANG_PARTNERS_ACCESS_KEY
+  const secretKey = process.env.COUPANG_PARTNERS_SECRET_KEY
+  if (!accessKey || !secretKey) {
+    throw clientError(
+      503,
+      'COUPANG_PARTNERS_NOT_CONFIGURED',
+      '쿠팡 페이지는 자동 접근을 차단합니다. 서버에 쿠팡 파트너스 API 키를 설정해 주세요.',
+    )
+  }
+
+  const path = '/v2/providers/affiliate_open_api/apis/openapi/v1/products/search'
+  const query = `keyword=${encodeURIComponent(productId)}&limit=10`
+  const authorization = createCoupangAuthorization({ accessKey, secretKey, method: 'GET', path, query })
+  let response
+  try {
+    response = await fetch(`https://api-gateway.coupang.com${path}?${query}`, {
+      headers: { Authorization: authorization, 'User-Agent': 'FitLoop/1.0' },
+      signal: AbortSignal.timeout(12_000),
+    })
+  } catch {
+    throw clientError(502, 'COUPANG_PARTNERS_FAILED', '쿠팡 상품 정보를 불러오지 못했습니다.')
+  }
+
+  const rawPayload = await readLimitedResponse(response, 1024 * 1024, '쿠팡 응답이 너무 큽니다.')
+  const payload = JSON.parse(rawPayload.toString('utf8') || '{}')
+  if (!response.ok || payload?.rCode !== '0') {
+    console.error('[fitloop] Coupang Partners error', response.status, cleanText(payload?.rMessage, 200))
+    throw clientError(502, 'COUPANG_PARTNERS_FAILED', '쿠팡 파트너스 API 요청에 실패했습니다.')
+  }
+
+  const products = Array.isArray(payload?.data?.productData)
+    ? payload.data.productData
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : []
+  const product = selectCoupangProduct(products, productId)
+  if (!product?.productImage) {
+    throw clientError(422, 'COUPANG_PRODUCT_NOT_FOUND', '쿠팡에서 동일한 상품의 대표 이미지를 찾지 못했습니다.')
+  }
+
+  const imageResponse = await fetchPublicResource(product.productImage, {
+    headers: { Accept: 'image/webp,image/png,image/jpeg;q=0.9,*/*;q=0.5' },
+  })
+  if (!imageResponse.ok) throw clientError(422, 'PRODUCT_IMAGE_NOT_FOUND', '쿠팡 상품 이미지를 불러오지 못했습니다.')
+  const imageType = (imageResponse.headers.get('content-type') || '').split(';')[0].toLowerCase()
+  return { image: await responseToImage(imageResponse, imageType), title: cleanText(product.productName, 160) }
+}
+
+async function importViaMetadataService(rawUrl) {
+  if (!METADATA_FALLBACK_URL) return null
+  try {
+    const endpoint = new URL(METADATA_FALLBACK_URL)
+    endpoint.searchParams.set('url', String(rawUrl))
+    endpoint.searchParams.set('meta', 'true')
+    const response = await fetchPublicResource(endpoint)
+    if (!response.ok) return null
+    const rawPayload = await readLimitedResponse(response, 1024 * 1024, '메타데이터 응답이 너무 큽니다.')
+    const payload = JSON.parse(rawPayload.toString('utf8') || '{}')
+    const data = payload?.data
+    const title = cleanText(data?.title, 160)
+    const description = cleanText(data?.description, 240)
+    if (!data || /access denied|forbidden|captcha|robot check/i.test(`${title} ${description}`)) return null
+    const imageUrl = typeof data.image === 'string' ? data.image : data.image?.url
+    if (!imageUrl) return null
+    const imageResponse = await fetchPublicResource(imageUrl, {
+      headers: { Accept: 'image/webp,image/png,image/jpeg;q=0.9,*/*;q=0.5', Referer: String(rawUrl) },
+    })
+    if (!imageResponse.ok) return null
+    const imageType = (imageResponse.headers.get('content-type') || '').split(';')[0].toLowerCase()
+    return { image: await responseToImage(imageResponse, imageType), title }
+  } catch (error) {
+    if (error?.code === 'REMOTE_FILE_TOO_LARGE') throw error
+    return null
+  }
 }
 
 async function fetchPublicResource(rawUrl, options = {}, redirectsRemaining = 5) {
