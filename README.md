@@ -47,6 +47,15 @@ FITLOOP_DAILY_GENERATION_LIMIT=5
 빌드하고 배포합니다. 빌드에는 비밀값이 아닌 API 주소만 포함되며, Gemini 키는 맥미니
 Keychain에만 저장됩니다. API가 일시적으로 연결되지 않으면 사용자에게 오류를 표시합니다.
 
+새 Gemini 키는 채팅이나 파일에 붙여넣지 않고 맥미니 터미널에서 다음 스크립트로 숨김 입력합니다.
+
+```bash
+./scripts/install-gemini-key.sh
+```
+
+스크립트는 키를 `fitloop-gemini-api-key`라는 macOS Keychain 항목으로 저장하고 API 서비스를
+재시작합니다. 공개된 적이 있는 키는 먼저 Google AI Studio에서 폐기한 뒤 새 키를 사용합니다.
+
 ## 백엔드 API
 
 - `GET /api/health` — 서버 및 Gemini 설정 상태
