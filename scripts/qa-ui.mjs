@@ -155,6 +155,10 @@ try {
   assert.equal(generatedModelLabels.size, 4)
   await page.getByRole('button', { name: /이 시안으로 광고 시작하기/ }).click()
   await page.getByRole('heading', { name: '성과 대시보드' }).waitFor()
+  assert.ok(
+    (await page.locator('img[src^="data:image/png"]').count()) > 0,
+    'dashboard should reuse images generated in the creative step',
+  )
   assert.equal(savedCampaign.settings.modelIds.length, 4)
   assert.equal(savedCampaign.generatedCreativeIds.length, 24)
   await page.close()

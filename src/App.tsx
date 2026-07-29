@@ -181,7 +181,7 @@ export default function App() {
         {step === 5 && (
           <>
             {notice && <p className="mx-auto mt-5 max-w-3xl rounded-2xl bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-800">{notice}</p>}
-            <Step4Dashboard dailyBudget={settings.dailyBudget} />
+            <Step4Dashboard dailyBudget={settings.dailyBudget} generated={generated} />
           </>
         )}
       </main>

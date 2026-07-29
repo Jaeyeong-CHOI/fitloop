@@ -10,12 +10,20 @@ import {
   YAxis,
 } from 'recharts'
 import { runSimulation, SIM_DAYS, type DayResult, type SimResult } from '../lib/simulate.ts'
-import { shortLabel } from '../lib/creatives.ts'
+import { shortLabel, type Creative } from '../lib/creatives.ts'
+import type { GeneratedCreative } from '../lib/types.ts'
 import CreativeVisual from '../components/CreativeVisual.tsx'
 import InfoTip from '../components/InfoTip.tsx'
 
 interface Props {
   dailyBudget: number
+  generated: Record<string, GeneratedCreative>
+}
+
+type GeneratedMap = Record<string, GeneratedCreative>
+
+function generatedImageFor(creative: Creative, generated: GeneratedMap): string | undefined {
+  return generated[creative.parentId ?? creative.id]?.imageUrl
 }
 
 const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
@@ -217,11 +225,13 @@ function MiniGrid({
   day,
   dayResult,
   topId,
+  generated,
 }: {
   sim: SimResult
   day: number
   dayResult: DayResult
   topId: string
+  generated: GeneratedMap
 }) {
   const parentsWithVariants = useMemo(() => {
     const set = new Set<string>()
@@ -250,7 +260,11 @@ function MiniGrid({
                       : 'border-line'
               }`}
             >
-              <CreativeVisual creative={cr} size="sm" />
+              <CreativeVisual
+                creative={cr}
+                size="sm"
+                imageUrl={generatedImageFor(cr, generated)}
+              />
               {off && (
                 <span className="absolute inset-x-0 bottom-0 bg-gray-900/70 py-0.5 text-center text-[9px] font-medium text-white">
                   자동 오프
@@ -280,7 +294,7 @@ function MiniGrid({
 }
 
 // ── 이번 주 성적표 ─────────────────────────────────────────────────────────────
-function WeeklyReport({ sim }: { sim: SimResult }) {
+function WeeklyReport({ sim, generated }: { sim: SimResult; generated: GeneratedMap }) {
   const { best, bestStat, totalSpend, totalRevenue, totalConversions, offCount, variantCount } =
     sim.summary
   const bestName = `${best.model.label} × ${best.background.label} × ${best.copy.label}${
@@ -297,7 +311,11 @@ function WeeklyReport({ sim }: { sim: SimResult }) {
       <div className="flex flex-col gap-6 sm:flex-row">
         <div className="w-28 shrink-0">
           <div className="aspect-[3/4] overflow-hidden rounded-2xl border border-brand-mid shadow-soft">
-            <CreativeVisual creative={best} size="sm" />
+            <CreativeVisual
+              creative={best}
+              size="sm"
+              imageUrl={generatedImageFor(best, generated)}
+            />
           </div>
           <p className="mt-2 text-center text-[11px] font-medium text-brand-deep">베스트 시안</p>
         </div>
@@ -345,7 +363,7 @@ function WeeklyReport({ sim }: { sim: SimResult }) {
 }
 
 // ── 메인 대시보드 ─────────────────────────────────────────────────────────────
-export default function Step4Dashboard({ dailyBudget }: Props) {
+export default function Step4Dashboard({ dailyBudget, generated }: Props) {
   const sim = useMemo(() => runSimulation(dailyBudget), [dailyBudget])
   // 발표 리허설용: ?day=7 로 특정 일자 화면 바로 확인 가능
   const [day, setDay] = useState(() => {
@@ -552,11 +570,17 @@ export default function Step4Dashboard({ dailyBudget }: Props) {
             </span>
           </div>
         </div>
-        <MiniGrid sim={sim} day={day} dayResult={dayResult} topId={topId} />
+        <MiniGrid
+          sim={sim}
+          day={day}
+          dayResult={dayResult}
+          topId={topId}
+          generated={generated}
+        />
       </section>
 
       {/* 성적표 */}
-      {day >= SIM_DAYS && <WeeklyReport sim={sim} />}
+      {day >= SIM_DAYS && <WeeklyReport sim={sim} generated={generated} />}
 
       <p className="mt-6 pb-4 text-center text-[11px] leading-relaxed break-keep text-faint">
         본 화면은 데모용 7일 시뮬레이션입니다 — 단, 예산 배분은 실제 톰슨 샘플링(Beta 사후분포)
