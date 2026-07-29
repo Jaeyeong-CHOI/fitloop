@@ -4,6 +4,7 @@ import { lookup } from 'node:dns/promises'
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { extractProductImageCandidates, extractProductTitle } from './lib/product-page.mjs'
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url))
 const DIST_DIR = join(ROOT, 'dist')
@@ -149,12 +150,15 @@ async function createProduct(body) {
   const id = randomUUID()
   let image = null
   let sourceUrl
+  let importedTitle = ''
 
   if (typeof body.imageDataUrl === 'string' && body.imageDataUrl) {
     image = decodeDataUrl(body.imageDataUrl)
   } else if (typeof body.sourceUrl === 'string' && body.sourceUrl) {
     sourceUrl = body.sourceUrl.slice(0, 2048)
-    image = await importImageFromUrl(sourceUrl)
+    const imported = await importImageFromUrl(sourceUrl)
+    image = imported.image
+    importedTitle = imported.title
   } else {
     throw clientError(400, 'PRODUCT_IMAGE_REQUIRED', '상품 이미지나 공개 상품 URL이 필요합니다.')
   }
@@ -165,7 +169,7 @@ async function createProduct(body) {
 
   return {
     id,
-    name: cleanText(body.name, 80) || '새 패션 상품',
+    name: cleanText(body.name, 80) || cleanText(importedTitle, 80) || '새 패션 상품',
     price: clampInt(body.price, 0, 100_000_000, 32900),
     category: cleanText(body.category, 60) || '패션',
     color: cleanText(body.color, 40) || '대표 컬러',
@@ -269,32 +273,64 @@ function buildCreativePrompt(input) {
 
 async function importImageFromUrl(rawUrl) {
   const pageUrl = await assertPublicUrl(rawUrl)
-  const response = await fetch(pageUrl, {
-    headers: { 'User-Agent': 'FitLoop/1.0 (+https://fitloop.jaeyeong2026.com)' },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(12_000),
+  const response = await fetchPublicResource(pageUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; FitLoop/1.0; +https://fitloop.jaeyeong2026.com)',
+      Accept: 'text/html,application/xhtml+xml,image/webp,image/png,image/jpeg;q=0.9,*/*;q=0.7',
+      'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.7',
+    },
   })
   if (!response.ok) throw clientError(422, 'SOURCE_FETCH_FAILED', '상품 URL을 불러오지 못했습니다.')
 
   const contentType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase()
-  if (contentType.startsWith('image/')) return responseToImage(response, contentType)
+  if (contentType.startsWith('image/')) {
+    return { image: await responseToImage(response, contentType), title: '' }
+  }
 
-  const html = await readLimitedResponse(response, 2 * 1024 * 1024)
+  const html = await readLimitedResponse(response, 3 * 1024 * 1024, '상품 페이지가 너무 큽니다.')
   const text = html.toString('utf8')
-  const match = text.match(
-    /<meta[^>]+(?:property|name)=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-  ) || text.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image["']/i)
-  if (!match?.[1]) throw clientError(422, 'PRODUCT_IMAGE_NOT_FOUND', '상품 페이지에서 대표 이미지를 찾지 못했습니다.')
+  const finalPageUrl = response.url || pageUrl.toString()
+  const candidates = extractProductImageCandidates(text, finalPageUrl).slice(0, 16)
+  for (const candidate of candidates) {
+    try {
+      const imageResponse = await fetchPublicResource(candidate.url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; FitLoop/1.0; +https://fitloop.jaeyeong2026.com)',
+          Accept: 'image/webp,image/png,image/jpeg;q=0.9,*/*;q=0.5',
+          Referer: finalPageUrl,
+        },
+      })
+      if (!imageResponse.ok) continue
+      const imageType = (imageResponse.headers.get('content-type') || '').split(';')[0].toLowerCase()
+      const image = await responseToImage(imageResponse, imageType)
+      return { image, title: extractProductTitle(text) }
+    } catch (error) {
+      if (error?.code === 'REMOTE_FILE_TOO_LARGE') throw error
+    }
+  }
+  throw clientError(422, 'PRODUCT_IMAGE_NOT_FOUND', '상품 페이지에서 사용할 수 있는 대표 이미지를 찾지 못했습니다.')
+}
 
-  const imageUrl = await assertPublicUrl(new URL(match[1], pageUrl).toString())
-  const imageResponse = await fetch(imageUrl, {
-    headers: { 'User-Agent': 'FitLoop/1.0 (+https://fitloop.jaeyeong2026.com)' },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(12_000),
-  })
-  if (!imageResponse.ok) throw clientError(422, 'PRODUCT_IMAGE_FETCH_FAILED', '대표 이미지를 내려받지 못했습니다.')
-  const imageType = (imageResponse.headers.get('content-type') || '').split(';')[0].toLowerCase()
-  return responseToImage(imageResponse, imageType)
+async function fetchPublicResource(rawUrl, options = {}, redirectsRemaining = 5) {
+  const url = await assertPublicUrl(rawUrl)
+  let response
+  try {
+    response = await fetch(url, {
+      ...options,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(12_000),
+    })
+  } catch (error) {
+    if (error?.status) throw error
+    throw clientError(422, 'SOURCE_FETCH_FAILED', '원격 페이지 또는 이미지를 불러오지 못했습니다.')
+  }
+  if ([301, 302, 303, 307, 308].includes(response.status)) {
+    if (redirectsRemaining <= 0) throw clientError(422, 'TOO_MANY_REDIRECTS', '리다이렉트가 너무 많습니다.')
+    const location = response.headers.get('location')
+    if (!location) throw clientError(422, 'SOURCE_FETCH_FAILED', '리다이렉트 주소가 올바르지 않습니다.')
+    return fetchPublicResource(new URL(location, url).toString(), options, redirectsRemaining - 1)
+  }
+  return response
 }
 
 async function responseToImage(response, mime) {
@@ -333,16 +369,20 @@ async function assertPublicUrl(value) {
 
 function isPrivateAddress(address) {
   const normalizedAddress = address.replace(/^::ffff:/, '')
-  if (normalizedAddress === '::1' || normalizedAddress === '0:0:0:0:0:0:0:1') return true
-  if (normalizedAddress.includes(':')) return /^(fc|fd|fe8|fe9|fea|feb)/i.test(normalizedAddress)
+  if (normalizedAddress === '::' || normalizedAddress === '::1' || normalizedAddress === '0:0:0:0:0:0:0:1') return true
+  if (normalizedAddress.includes(':')) return /^(?:fc|fd|fe8|fe9|fea|feb|ff|2001:db8)/i.test(normalizedAddress)
   const parts = normalizedAddress.split('.').map(Number)
   return (
     parts[0] === 10 ||
     parts[0] === 127 ||
+    (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) ||
     (parts[0] === 169 && parts[1] === 254) ||
     (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
-    (parts[0] === 192 && parts[1] === 168) ||
-    parts[0] === 0
+    (parts[0] === 192 && (parts[1] === 0 || parts[1] === 168)) ||
+    (parts[0] === 198 && (parts[1] === 18 || parts[1] === 19 || parts[1] === 51)) ||
+    (parts[0] === 203 && parts[1] === 0 && parts[2] === 113) ||
+    parts[0] === 0 ||
+    parts[0] >= 224
   )
 }
 
@@ -507,7 +547,7 @@ async function readJson(req, maxBytes) {
   }
 }
 
-async function readLimitedResponse(response, maxBytes) {
+async function readLimitedResponse(response, maxBytes, tooLargeMessage = '원격 이미지가 너무 큽니다.') {
   const reader = response.body?.getReader()
   if (!reader) return Buffer.alloc(0)
   const chunks = []
@@ -518,7 +558,7 @@ async function readLimitedResponse(response, maxBytes) {
     size += value.byteLength
     if (size > maxBytes) {
       await reader.cancel()
-      throw clientError(413, 'REMOTE_FILE_TOO_LARGE', '원격 이미지가 너무 큽니다.')
+      throw clientError(413, 'REMOTE_FILE_TOO_LARGE', tooLargeMessage)
     }
     chunks.push(Buffer.from(value))
   }
