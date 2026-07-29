@@ -162,7 +162,7 @@ try {
   await page.getByRole('button', { name: '24종 생성 완료' }).waitFor({ timeout: 10_000 })
 
   assert.equal(completedGenerations, 24)
-  assert.equal(maxActiveGenerations, 4)
+  assert.equal(maxActiveGenerations, 12)
   assert.equal(generatedModelLabels.size, 4)
   assert.ok(
     [...generatedModelLabels].every((label) => label.startsWith('남성·')),

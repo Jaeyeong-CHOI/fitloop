@@ -4,7 +4,7 @@ import { generateCreative } from '../lib/api.ts'
 import { CREATIVES, type Creative } from '../lib/creatives.ts'
 import type { BackendHealth, GeneratedCreative, ProductRecord } from '../lib/types.ts'
 
-const PARALLEL_GENERATION_COUNT = 4
+const PARALLEL_GENERATION_COUNT = 12
 
 interface Props {
   product: ProductRecord
@@ -126,7 +126,8 @@ export default function Step2Creatives({
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed break-keep text-sub">
             {selectedModelCount === 1 ? '선택한 모델의 포즈 4종' : `선택한 모델 ${selectedModelCount}종`} ×
-            배경 3종 × 카피 2종을 최대 4개씩 병렬 생성합니다. 완료되는 순서대로 실제 착용샷이 표시됩니다.
+            배경 3종 × 카피 2종을 최대 {PARALLEL_GENERATION_COUNT}개씩 초고속 병렬 생성합니다.
+            완료되는 순서대로 실제 착용샷이 표시됩니다.
           </p>
         </div>
         <button
