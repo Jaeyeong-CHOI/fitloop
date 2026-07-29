@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { DragEvent, FormEvent } from 'react'
 import { saveProduct } from '../lib/api.ts'
-import { DEMO_PRODUCT, type ProductRecord } from '../lib/types.ts'
+import type { ProductRecord } from '../lib/types.ts'
 
 interface Props {
   product: ProductRecord | null
@@ -62,12 +62,6 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
     event.preventDefault()
     setDragOver(false)
     handleFile(event.dataTransfer.files[0])
-  }
-
-  const useDemo = () => {
-    onProduct(DEMO_PRODUCT)
-    setPhase('done')
-    setError('')
   }
 
   return (
@@ -146,9 +140,6 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
               <span className="text-xs text-faint">JPG, PNG, WebP · 최대 8MB</span>
             </button>
 
-            <button type="button" onClick={useDemo} className="mx-auto mt-4 block cursor-pointer text-xs font-medium text-sub underline decoration-line underline-offset-4 hover:text-ink">
-              업로드 없이 샘플 상품으로 둘러보기
-            </button>
           </>
         )}
 
@@ -172,7 +163,7 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
             <div className="mb-4 flex items-center justify-between gap-3">
               <span className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100">✓</span>
-                {product.id === 'demo' ? '샘플 상품 준비 완료' : '상품 준비 완료'}
+                상품 분석 완료
               </span>
               <button type="button" onClick={() => setPhase('idle')} className="cursor-pointer text-xs text-faint hover:text-ink">
                 다른 상품 선택

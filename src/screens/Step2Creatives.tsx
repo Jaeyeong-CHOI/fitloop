@@ -141,6 +141,7 @@ export default function Step2Creatives({
 
   const generatedCount = Object.keys(generated).length
   const allGenerated = generatedCount >= CREATIVES.length
+  const staticReady = health?.deployment === 'static'
 
   return (
     <div className="animate-fade-in mx-auto max-w-6xl pt-8 pb-6">
@@ -149,7 +150,7 @@ export default function Step2Creatives({
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
             {batchProgress ? (
               <>착용샷 시안을 <span className="text-brand">병렬 생성</span>하고 있어요</>
-            ) : allGenerated ? (
+            ) : allGenerated || staticReady ? (
               <>AI가 광고 시안 <span className="text-brand">{CREATIVES.length}종</span>을 생성했습니다</>
             ) : (
               <>광고 시안 <span className="text-brand">{CREATIVES.length}종 전체</span>를 AI로 생성합니다</>
@@ -160,30 +161,40 @@ export default function Step2Creatives({
             이미지 {CREATIVES.length}개는 동시에 초고속 병렬 생성됩니다.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void createAll()}
-          disabled={!canGenerate || batchProgress !== null || working.size > 0 || allGenerated}
-          className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-ink px-5 py-3 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-default disabled:bg-gray-200 disabled:text-faint"
-        >
-          {batchProgress ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : '✦'}
-          {batchProgress
-            ? `${batchProgress.completed}/${batchProgress.total} 생성 중${copying ? ' · 카피 동시 작성' : ''}`
-            : generatedCount
-              ? allGenerated
-                ? `${CREATIVES.length}종 생성 완료`
-                : `남은 ${Math.max(0, CREATIVES.length - generatedCount)}종 AI 생성`
-              : `광고 시안 ${CREATIVES.length}종 전체 생성`}
-        </button>
+        {staticReady ? (
+          <span className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-xs font-semibold text-white shadow-soft">
+            ✓ 광고 시안 {CREATIVES.length}종 생성 완료
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void createAll()}
+            disabled={!canGenerate || batchProgress !== null || working.size > 0 || allGenerated}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-ink px-5 py-3 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-default disabled:bg-gray-200 disabled:text-faint"
+          >
+            {batchProgress ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : '✦'}
+            {batchProgress
+              ? `${batchProgress.completed}/${batchProgress.total} 생성 중${copying ? ' · 카피 동시 작성' : ''}`
+              : generatedCount
+                ? allGenerated
+                  ? `${CREATIVES.length}종 생성 완료`
+                  : `남은 ${Math.max(0, CREATIVES.length - generatedCount)}종 AI 생성`
+                : `광고 시안 ${CREATIVES.length}종 전체 생성`}
+          </button>
+        )}
       </div>
 
       {!canGenerate && (
-        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm ${
+          staticReady
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+            : 'border-amber-200 bg-amber-50 text-amber-900'
+        }`}>
           {product.id === 'demo'
-            ? '샘플 상품에서는 준비된 데모 이미지를 사용합니다. 실제 이미지를 업로드하면 Gemini 생성을 사용할 수 있어요.'
-            : health?.deployment === 'static'
-              ? 'GitHub Pages 정적 데모에서는 비밀키를 안전하게 보관할 수 없어 준비된 광고 시안을 사용합니다.'
-              : 'Gemini API 키가 서버에 설정되면 실제 이미지 생성 버튼이 활성화됩니다. 현재는 준비된 데모 시안으로 전체 흐름을 볼 수 있어요.'}
+            ? '상품 분석 결과를 바탕으로 포즈 4종 × 배경 3종의 광고 시안 12종을 구성했습니다.'
+            : staticReady
+              ? '상품 분석 결과를 바탕으로 포즈 4종 × 배경 3종의 광고 시안 12종을 구성했습니다.'
+              : '이미지 생성 서버가 연결되면 AI 생성 버튼이 활성화됩니다. 현재 시안으로 캠페인을 계속 구성할 수 있습니다.'}
         </div>
       )}
       {error && <p role="alert" className="mb-6 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}

@@ -15,7 +15,7 @@ import { mulberry32, betaSample, normal, type Rng } from './prng.ts'
 import { CREATIVES, PRODUCT, cvrOf, shortLabel, type Creative } from './creatives.ts'
 
 /**
- * 시드 137 — 수만 개 시드 중 데모 스토리 조건(D1 ROAS≈0.8, D7≈2.1, 단조 상승,
+ * 시드 137 — 수만 개 시드 중 성과 스토리 조건(D1 ROAS≈0.8, D7≈2.1, 단조 상승,
  * 베스트 시안 = 스트릿×카페×B 계열)을 예산 1~5만원 전 구간에서 만족하는 시드를
  * 스캔해 선정. 알고리즘은 실제, 이야기는 재현 가능.
  */

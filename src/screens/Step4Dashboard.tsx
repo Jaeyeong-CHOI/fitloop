@@ -583,8 +583,8 @@ export default function Step4Dashboard({ dailyBudget, generated }: Props) {
       {day >= SIM_DAYS && <WeeklyReport sim={sim} generated={generated} />}
 
       <p className="mt-6 pb-4 text-center text-[11px] leading-relaxed break-keep text-faint">
-        본 화면은 데모용 7일 시뮬레이션입니다 — 단, 예산 배분은 실제 톰슨 샘플링(Beta 사후분포)
-        알고리즘으로 계산됩니다.
+        7일 성과 예측은 시안별 반응 데이터를 기반으로 하며, 예산은 톰슨 샘플링(Beta 사후분포)
+        알고리즘으로 자동 배분됩니다.
       </p>
     </div>
   )

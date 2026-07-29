@@ -112,11 +112,11 @@ export default function App() {
         })
         setNotice(
           health?.deployment === 'static'
-            ? `캠페인 ${campaign.id.slice(0, 8)}가 이 브라우저에 준비됐습니다.`
+            ? '캠페인이 시작되었습니다. 7일 성과 예측을 확인하세요.'
             : `캠페인 ${campaign.id.slice(0, 8)}가 서버에 저장됐습니다.`,
         )
       } catch {
-        setNotice('캠페인 저장은 실패했지만 데모 성과 화면은 계속 볼 수 있습니다.')
+        setNotice('캠페인 저장을 완료하지 못했습니다. 성과 예측 화면은 계속 확인할 수 있습니다.')
       }
     }
     go(5)
@@ -130,7 +130,7 @@ export default function App() {
           <div className="flex items-center gap-2.5">
             <Logo />
             <span className="hidden rounded-full border border-line bg-gray-50 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-sub sm:inline-flex">
-              GRAFFITI 2026 데모
+              AI PERFORMANCE MARKETING
             </span>
           </div>
           <StepIndicator current={step} maxReached={maxReached} onSelect={go} />
@@ -139,7 +139,7 @@ export default function App() {
               <span className={`h-1.5 w-1.5 rounded-full ${health ? 'bg-emerald-500' : 'bg-gray-300'}`} />
               {health
                 ? health.deployment === 'static'
-                  ? 'GitHub 정적 데모'
+                  ? '서비스 준비 완료'
                   : health.geminiConfigured
                     ? '서버 · Gemini 준비'
                     : '서버 연결됨'

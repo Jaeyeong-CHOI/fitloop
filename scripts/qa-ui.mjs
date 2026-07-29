@@ -47,7 +47,7 @@ try {
           category: '여성 니트',
           color: '아이보리',
           fit: '크롭 핏',
-          imageUrl: null,
+          imageUrl: '/creatives/c01.jpg',
           createdAt: new Date().toISOString(),
         }),
       }),
@@ -78,8 +78,9 @@ try {
     await assertNoHorizontalOverflow(page, `${viewport.name} home`)
     await page.screenshot({ path: `${outputDir}/${viewport.name}-home.png`, fullPage: true })
 
-    await page.getByRole('button', { name: /샘플 상품으로 둘러보기/ }).click()
-    await page.getByText('샘플 상품 준비 완료').waitFor()
+    await page.getByPlaceholder(/상품 URL/).fill('https://www.musinsa.com/products/4672509')
+    await page.getByRole('button', { name: '가져오기' }).click()
+    await page.getByText('상품 분석 완료').waitFor()
     await page.getByRole('button', { name: /예산과 타겟 정하러 가기/ }).click()
     await page.getByRole('heading', { name: /얼마로, 누구에게/ }).waitFor()
     await page.waitForTimeout(600)
@@ -95,7 +96,7 @@ try {
 
     await page.getByRole('button', { name: /이 모델 4명으로 시안 12종 만들기/ }).click()
     await page.getByRole('heading', { name: /광고 시안/ }).waitFor()
-    await page.getByText(/샘플 상품에서는 준비된 데모 이미지/).waitFor()
+    await page.getByText(/광고 시안 12종을 구성/).waitFor()
     await page.waitForTimeout(1_000)
     await assertNoHorizontalOverflow(page, `${viewport.name} creatives`)
     await page.screenshot({ path: `${outputDir}/${viewport.name}-creatives.png`, fullPage: true })

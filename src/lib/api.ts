@@ -5,6 +5,7 @@ import type {
   GeneratedCreative,
   ProductRecord,
 } from './types.ts'
+import { DEMO_PRODUCT } from './types.ts'
 
 interface ApiErrorBody {
   error?: string
@@ -72,13 +73,14 @@ export function saveProduct(input: {
 }): Promise<ProductRecord> {
   if (STATIC_FALLBACK) {
     const product: ProductRecord = {
+      ...DEMO_PRODUCT,
       id: localId('product'),
-      name: input.name || (input.sourceUrl ? '가져온 상품 데모' : '업로드한 상품'),
-      price: input.price || 32900,
-      category: input.category || '패션 의류',
-      color: input.color || '이미지 기반',
-      fit: input.fit || '기본 핏',
-      imageUrl: input.imageDataUrl || null,
+      name: input.name || (input.sourceUrl ? DEMO_PRODUCT.name : '업로드한 상품'),
+      price: input.price || DEMO_PRODUCT.price,
+      category: input.category || DEMO_PRODUCT.category,
+      color: input.color || DEMO_PRODUCT.color,
+      fit: input.fit || DEMO_PRODUCT.fit,
+      imageUrl: input.imageDataUrl || DEMO_PRODUCT.imageUrl,
       sourceUrl: input.sourceUrl,
       createdAt: new Date().toISOString(),
     }
@@ -101,7 +103,7 @@ export function generateCreative(input: {
   copyText: string
 }): Promise<GeneratedCreative> {
   if (STATIC_FALLBACK) {
-    return Promise.reject(new Error('GitHub Pages 정적 버전에서는 Gemini 생성을 사용할 수 없습니다.'))
+    return Promise.reject(new Error('이미지 생성 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.'))
   }
   return request<GeneratedCreative>('/api/creatives/generate', {
     method: 'POST',
@@ -120,7 +122,7 @@ export function generateCopies(input: {
   }>
 }): Promise<GeneratedCopyBatch> {
   if (STATIC_FALLBACK) {
-    return Promise.reject(new Error('GitHub Pages 정적 버전에서는 Gemini 카피 생성을 사용할 수 없습니다.'))
+    return Promise.reject(new Error('카피 생성 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.'))
   }
   return request<GeneratedCopyBatch>('/api/copies/generate', {
     method: 'POST',

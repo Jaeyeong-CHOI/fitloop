@@ -37,6 +37,9 @@ async function installPresentationLayer() {
         transition: transform .65s cubic-bezier(.22,.8,.22,1), width .15s, height .15s;
         pointer-events: none;
       }
+      .animate-fade-up, .animate-fade-in {
+        animation: none !important;
+      }
       #fitloop-demo-caption {
         position: fixed;
         z-index: 99998;
@@ -82,7 +85,7 @@ async function installPresentationLayer() {
     const outro = document.createElement('div')
     outro.id = 'fitloop-demo-outro'
     outro.innerHTML =
-      '<div><strong>FitL<i>oo</i>p</strong><p>사진 한 장에서 매출까지, 루프를 돌립니다.</p><small>fitloop-demo.jaeyeong2026.com</small></div>'
+      '<div><strong>FitL<i>oo</i>p</strong><p>사진 한 장에서 매출까지, 루프를 돌립니다.</p><small>fitloop.jaeyeong2026.com</small></div>'
     document.body.append(cursor, caption, outro)
   })
 }
@@ -124,10 +127,10 @@ await pause(3_500)
 const urlInput = page.getByPlaceholder(/상품 URL/)
 await moveTo(urlInput)
 await urlInput.click()
-await page.keyboard.type('https://shop.example.com/products/cream-cardigan', { delay: 42 })
+await page.keyboard.type('https://www.musinsa.com/products/4672509', { delay: 42 })
 await pause(1_400)
-await caption('데모에서는 준비된 상품을 불러와 전체 과정을 빠르게 확인합니다.')
-await click(page.getByRole('button', { name: /샘플 상품으로 둘러보기/ }), 2_700)
+await caption('상품 페이지를 분석해 대표 이미지와 상품 정보를 자동으로 가져옵니다.')
+await click(page.getByRole('button', { name: '가져오기' }), 2_700)
 
 await caption('상품 정보가 준비되면 예산과 타겟을 정합니다.')
 await click(page.getByRole('button', { name: /예산과 타겟 정하러 가기/ }), 1_600)
