@@ -23,7 +23,8 @@ await loadEnv(join(ROOT, '.env'))
 await Promise.all([mkdir(UPLOAD_DIR, { recursive: true }), mkdir(GENERATED_DIR, { recursive: true })])
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image'
-const GENERATION_LIMIT = clampInt(process.env.FITLOOP_DAILY_GENERATION_LIMIT, 1, 50, 30)
+const configuredGenerationLimit = Number(process.env.FITLOOP_DAILY_GENERATION_LIMIT || 0)
+const GENERATION_LIMIT = configuredGenerationLimit > 0 ? clampInt(configuredGenerationLimit, 1, 500, 30) : null
 const METADATA_FALLBACK_URL = process.env.FITLOOP_METADATA_FALLBACK_URL || ''
 const ALLOWED_ORIGINS = new Set(
   (process.env.FITLOOP_ALLOWED_ORIGINS ||
@@ -92,6 +93,7 @@ async function handleApi(req, res, url) {
         process.env.COUPANG_PARTNERS_ACCESS_KEY && process.env.COUPANG_PARTNERS_SECRET_KEY,
       ),
       imageModel: IMAGE_MODEL,
+      generationLimit: GENERATION_LIMIT,
       persistence: true,
       deployment: 'server',
     })
@@ -126,7 +128,7 @@ async function handleApi(req, res, url) {
       await appendStore('generated.json', generated)
       return json(res, 201, generated)
     } catch (error) {
-      await releaseDailyGeneration(reservation)
+      if (reservation) await releaseDailyGeneration(reservation)
       throw error
     }
   }
@@ -529,6 +531,7 @@ function rateLimit(req, bucket, limit, windowMs) {
 }
 
 async function reserveDailyGeneration(req) {
+  if (GENERATION_LIMIT === null) return null
   const day = new Date().toISOString().slice(0, 10)
   const fingerprint = clientFingerprint(req)
   await mutateStore('usage.json', (items) => {

@@ -72,11 +72,11 @@ export default function Step2Creatives({ product, health, generated, onGenerated
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            광고 시안 <span className="text-brand">24종</span>을 준비했습니다
+            광고 시안 <span className="text-brand">24종 전체</span>를 AI로 생성합니다
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed break-keep text-sub">
-            모델 4종 × 배경 3종 × 카피 2종을 테스트합니다. 버튼 한 번으로 실제 상품을 입힌
-            광고 이미지 24종을 모두 생성합니다.
+            모델 4종 × 배경 3종 × 카피 2종을 테스트합니다. 생성이 끝나는 순서대로 모든 카드에
+            실제 상품을 입힌 이미지가 표시됩니다.
           </p>
         </div>
         <button
@@ -90,7 +90,7 @@ export default function Step2Creatives({ product, health, generated, onGenerated
             ? `${batchProgress.completed}/${batchProgress.total} 생성 중`
             : Object.keys(generated).length
               ? `남은 ${Math.max(0, CREATIVES.length - Object.keys(generated).length)}종 AI 생성`
-              : '24종 모두 AI 생성'}
+              : '광고 시안 24종 전체 생성'}
         </button>
       </div>
 

@@ -14,6 +14,7 @@ export interface BackendHealth {
   ok: boolean
   geminiConfigured: boolean
   imageModel: string
+  generationLimit?: number | null
   persistence: boolean
   deployment?: 'server' | 'static'
 }
