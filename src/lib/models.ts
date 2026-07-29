@@ -73,3 +73,13 @@ export function filterLibrary(selection: ModelSelection): LibraryModel[] {
       selection.bodies.includes(model.body),
   )
 }
+
+export function reconcileModelIds(
+  selection: ModelSelection,
+  selectedIds: string[],
+): string[] {
+  const eligible = filterLibrary(selection)
+  const eligibleIds = new Set(eligible.map((model) => model.id))
+  const kept = selectedIds.filter((id) => eligibleIds.has(id))
+  return [...new Set([...kept, ...eligible.map((model) => model.id)])].slice(0, MODEL_SLOTS)
+}

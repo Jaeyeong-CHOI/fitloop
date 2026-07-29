@@ -11,6 +11,7 @@ import {
   DEFAULT_MODEL_IDS,
   DEFAULT_SELECTION,
   MODEL_LIBRARY,
+  reconcileModelIds,
   slotLabels,
   type ModelSelection,
 } from './lib/models.ts'
@@ -82,13 +83,9 @@ export default function App() {
 
   const continueToModels = () => {
     const genders = settings.gender === '전체' ? ['여성', '남성'] : [settings.gender]
-    const candidates = MODEL_LIBRARY.filter((model) => genders.includes(model.gender))
-    setModelSelection((current) => ({ ...current, genders }))
-    setModelIds((current) => {
-      const candidateIds = new Set(candidates.map((model) => model.id))
-      const kept = current.filter((id) => candidateIds.has(id))
-      return [...new Set([...kept, ...candidates.map((model) => model.id)])].slice(0, 4)
-    })
+    const nextSelection = { ...modelSelection, genders }
+    setModelSelection(nextSelection)
+    setModelIds((current) => reconcileModelIds(nextSelection, current))
     go(3)
   }
 

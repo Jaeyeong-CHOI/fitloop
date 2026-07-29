@@ -4,6 +4,7 @@ import {
   MODEL_SLOTS,
   filterLibrary,
   modelLabel,
+  reconcileModelIds,
   type LibraryModel,
   type ModelSelection,
 } from '../lib/models.ts'
@@ -40,10 +41,17 @@ export default function Step3Models({
 
   const toggleFilter = (key: keyof ModelSelection, option: string) => {
     const current = selection[key]
-    const next = current.includes(option)
-      ? current.filter((value) => value !== option)
-      : [...current, option]
-    if (next.length) onChange({ ...selection, [key]: next })
+    const next =
+      key === 'genders'
+        ? [option]
+        : current.includes(option)
+          ? current.filter((value) => value !== option)
+          : [...current, option]
+    if (!next.length) return
+
+    const nextSelection = { ...selection, [key]: next }
+    onChange(nextSelection)
+    onSelect(reconcileModelIds(nextSelection, selectedIds))
   }
 
   const toggleModel = (id: string) => {

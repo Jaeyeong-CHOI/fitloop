@@ -151,7 +151,11 @@ try {
   await page.getByRole('button', { name: '가져오기' }).click()
   await page.getByText(/상품 준비 완료/).waitFor()
   await page.getByRole('button', { name: /예산과 타겟 정하러 가기/ }).click()
+  await page.getByRole('button', { name: '남성', exact: true }).click()
   await page.getByRole('button', { name: /모델 고르러 가기/ }).click()
+  await page.getByText('FL-M01').waitFor()
+  assert.equal(await page.getByText(/^FL-W0/).count(), 0)
+  await page.getByText('4/4명 선택됨').waitFor()
   await page.getByRole('button', { name: /이 모델 4명으로 시안 24종 만들기/ }).click()
   await page.getByRole('heading', { name: /병렬 생성/ }).waitFor()
   assert.ok(await page.locator('[aria-label$="생성 대기 중"]').count())
@@ -160,12 +164,17 @@ try {
   assert.equal(completedGenerations, 24)
   assert.equal(maxActiveGenerations, 4)
   assert.equal(generatedModelLabels.size, 4)
+  assert.ok(
+    [...generatedModelLabels].every((label) => label.startsWith('남성·')),
+    'male targeting should only generate male model prompts',
+  )
   await page.getByRole('button', { name: /이 시안으로 광고 시작하기/ }).click()
   await page.getByRole('heading', { name: '성과 대시보드' }).waitFor()
   assert.ok(
     (await page.locator('img[src^="https://generated.fitloop.test/"]').count()) > 0,
     'dashboard should reuse images generated in the creative step',
   )
+  assert.equal(savedCampaign.settings.gender, '남성')
   assert.equal(savedCampaign.settings.modelIds.length, 4)
   assert.equal(savedCampaign.generatedCreativeIds.length, 24)
   await page.close()
