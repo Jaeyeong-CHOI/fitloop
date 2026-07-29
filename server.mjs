@@ -23,8 +23,6 @@ await loadEnv(join(ROOT, '.env'))
 await Promise.all([mkdir(UPLOAD_DIR, { recursive: true }), mkdir(GENERATED_DIR, { recursive: true })])
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image'
-const configuredGenerationLimit = Number(process.env.FITLOOP_DAILY_GENERATION_LIMIT || 0)
-const GENERATION_LIMIT = configuredGenerationLimit > 0 ? clampInt(configuredGenerationLimit, 1, 500, 30) : null
 const METADATA_FALLBACK_URL = process.env.FITLOOP_METADATA_FALLBACK_URL || ''
 const ALLOWED_ORIGINS = new Set(
   (process.env.FITLOOP_ALLOWED_ORIGINS ||
@@ -93,7 +91,7 @@ async function handleApi(req, res, url) {
         process.env.COUPANG_PARTNERS_ACCESS_KEY && process.env.COUPANG_PARTNERS_SECRET_KEY,
       ),
       imageModel: IMAGE_MODEL,
-      generationLimit: GENERATION_LIMIT,
+      generationLimit: null,
       persistence: true,
       deployment: 'server',
     })
@@ -122,15 +120,9 @@ async function handleApi(req, res, url) {
       })
     }
     const body = await readJson(req, 128 * 1024)
-    const reservation = await reserveDailyGeneration(req)
-    try {
-      const generated = await createCreative(body)
-      await appendStore('generated.json', generated)
-      return json(res, 201, generated)
-    } catch (error) {
-      if (reservation) await releaseDailyGeneration(reservation)
-      throw error
-    }
+    const generated = await createCreative(body)
+    await appendStore('generated.json', generated)
+    return json(res, 201, generated)
   }
 
   if (req.method === 'POST' && url.pathname === '/api/campaigns') {
@@ -530,35 +522,6 @@ function rateLimit(req, bucket, limit, windowMs) {
   current.count++
 }
 
-async function reserveDailyGeneration(req) {
-  if (GENERATION_LIMIT === null) return null
-  const day = new Date().toISOString().slice(0, 10)
-  const fingerprint = clientFingerprint(req)
-  await mutateStore('usage.json', (items) => {
-    const retained = items.filter((item) => item.day === day)
-    const current = retained.find((item) => item.fingerprint === fingerprint)
-    if (current && current.count >= GENERATION_LIMIT) {
-      throw clientError(429, 'DAILY_GENERATION_LIMIT', `하루 이미지 생성 한도(${GENERATION_LIMIT}장)를 사용했습니다.`)
-    }
-    if (current) current.count++
-    else retained.push({ day, fingerprint, count: 1 })
-    return retained
-  })
-  return { day, fingerprint }
-}
-
-async function releaseDailyGeneration({ day, fingerprint }) {
-  await mutateStore('usage.json', (items) =>
-    items
-      .map((item) =>
-        item.day === day && item.fingerprint === fingerprint
-          ? { ...item, count: Math.max(0, item.count - 1) }
-          : item,
-      )
-      .filter((item) => item.count > 0),
-  )
-}
-
 function clientFingerprint(req) {
   const ip = String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown')
     .split(',')[0]
@@ -725,11 +688,6 @@ function cleanText(value, maxLength) {
     .join('')
     .trim()
     .slice(0, maxLength)
-}
-
-function clampInt(value, min, max, fallback) {
-  const number = Number(value)
-  return Number.isFinite(number) ? Math.min(max, Math.max(min, Math.round(number))) : fallback
 }
 
 function productPrice(value) {
