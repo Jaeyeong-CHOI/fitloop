@@ -30,9 +30,10 @@ try {
 
     await page.getByRole('button', { name: /샘플 상품으로 둘러보기/ }).click()
     await page.getByText('샘플 상품 준비 완료').waitFor()
-    await page.getByRole('button', { name: /착용샷 시안 만들기/ }).click()
+    await page.getByRole('button', { name: /착용샷 시안.*만들기/ }).click()
     await page.getByRole('heading', { name: /광고 시안/ }).waitFor()
     await page.getByText(/샘플 상품에서는 준비된 데모 이미지/).waitFor()
+    await page.waitForTimeout(1_000)
     await page.screenshot({ path: `${outputDir}/${viewport.name}-creatives.png`, fullPage: true })
 
     await page.getByRole('button', { name: /이 시안으로 집행 설정하기/ }).click()
@@ -42,8 +43,78 @@ try {
     await page.close()
   }
 
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+  let activeGenerations = 0
+  let completedGenerations = 0
+  let maxActiveGenerations = 0
+  const pixel =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XwLzWQAAAABJRU5ErkJggg=='
+
+  await page.route('**/api/health', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        geminiConfigured: true,
+        imageModel: 'qa-image-model',
+        generationLimit: null,
+        persistence: true,
+        deployment: 'server',
+      }),
+    }),
+  )
+  await page.route('**/api/products', (route) =>
+    route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'qa-product',
+        name: '병렬 생성 테스트 상품',
+        price: 32900,
+        category: '패션',
+        color: '블랙',
+        fit: '기본 핏',
+        imageUrl: pixel,
+        sourceUrl: 'https://example.com/product',
+        createdAt: new Date().toISOString(),
+      }),
+    }),
+  )
+  await page.route('**/api/creatives/generate', async (route) => {
+    const input = route.request().postDataJSON()
+    activeGenerations++
+    maxActiveGenerations = Math.max(maxActiveGenerations, activeGenerations)
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    completedGenerations++
+    activeGenerations--
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: `generated-${input.creativeId}`,
+        creativeId: input.creativeId,
+        imageUrl: pixel,
+        model: 'qa-image-model',
+        createdAt: new Date().toISOString(),
+      }),
+    })
+  })
+
+  await page.goto(baseUrl, { waitUntil: 'networkidle' })
+  await page.getByPlaceholder(/상품 URL/).fill('https://example.com/product')
+  await page.getByRole('button', { name: '가져오기' }).click()
+  await page.getByText(/상품 준비 완료/).waitFor()
+  await page.getByRole('button', { name: /착용샷 시안.*만들기/ }).click()
+  await page.getByRole('button', { name: '남은 0종 AI 생성' }).waitFor({ timeout: 10_000 })
+
+  assert.equal(completedGenerations, 24)
+  assert.equal(maxActiveGenerations, 4)
+  await page.close()
+
   assert.deepEqual(errors, [])
   console.log(`UI QA passed: ${baseUrl}`)
+  console.log(`Parallel generation QA passed: 24 requests, max concurrency ${maxActiveGenerations}`)
   console.log(`Screenshots: ${outputDir}`)
 } finally {
   await browser.close()

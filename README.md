@@ -36,7 +36,6 @@ npm run qa:ui
 ```bash
 GEMINI_API_KEY=...
 GEMINI_IMAGE_MODEL=gemini-3.1-flash-image
-FITLOOP_DAILY_GENERATION_LIMIT=1000
 COUPANG_PARTNERS_ACCESS_KEY=...
 COUPANG_PARTNERS_SECRET_KEY=...
 ```
@@ -71,6 +70,10 @@ Keychain에만 저장됩니다. API가 일시적으로 연결되지 않으면 �
 - `POST /api/products` — 파일 업로드 또는 공개 URL의 상품 이미지 저장
 - `POST /api/creatives/generate` — Gemini 착용 시안 생성 및 저장
 - `POST /api/campaigns` — 캠페인 설정과 생성 시안 연결
+
+앱 자체의 일일 이미지 생성 한도는 두지 않습니다. 24종 일괄 생성은 Gemini 과부하를 줄이면서
+속도를 높이도록 최대 4개 요청을 병렬 처리하며, 서버는 동시 완료된 결과를 저장 큐로 안전하게
+직렬 기록합니다. 단, Google 계정의 결제 잔액과 Gemini API 공급자 쿼터는 그대로 적용됩니다.
 
 저장 데이터는 `data/` 아래에 기록되며 Git에는 포함되지 않습니다. 구매 페이지 URL을 넣으면
 Open Graph, Product JSON-LD, Twitter Card, 동적 스크립트, 대표/지연 로딩 이미지, CSS 배경

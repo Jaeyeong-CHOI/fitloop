@@ -13,17 +13,19 @@ import {
 } from './lib/coupang-partners.mjs'
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url))
+await loadEnv(join(ROOT, '.env'))
+
 const DIST_DIR = join(ROOT, 'dist')
-const DATA_DIR = join(ROOT, 'data')
+const DATA_DIR = resolve(process.env.FITLOOP_DATA_DIR || join(ROOT, 'data'))
 const UPLOAD_DIR = join(DATA_DIR, 'uploads')
 const GENERATED_DIR = join(DATA_DIR, 'generated')
 const PORT = Number(process.env.PORT || 5202)
 
-await loadEnv(join(ROOT, '.env'))
 await Promise.all([mkdir(UPLOAD_DIR, { recursive: true }), mkdir(GENERATED_DIR, { recursive: true })])
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image'
-const GENERATION_LIMIT = clampInt(process.env.FITLOOP_DAILY_GENERATION_LIMIT, 1, 10_000, 1000)
+const GEMINI_API_URL =
+  process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/interactions'
 const METADATA_FALLBACK_URL = process.env.FITLOOP_METADATA_FALLBACK_URL || ''
 const ALLOWED_ORIGINS = new Set(
   (process.env.FITLOOP_ALLOWED_ORIGINS ||
@@ -92,7 +94,7 @@ async function handleApi(req, res, url) {
         process.env.COUPANG_PARTNERS_ACCESS_KEY && process.env.COUPANG_PARTNERS_SECRET_KEY,
       ),
       imageModel: IMAGE_MODEL,
-      generationLimit: GENERATION_LIMIT,
+      generationLimit: null,
       persistence: true,
       deployment: 'server',
     })
@@ -121,7 +123,6 @@ async function handleApi(req, res, url) {
       })
     }
     const body = await readJson(req, 128 * 1024)
-    await enforceDailyGenerationLimit()
     const generated = await createCreative(body)
     await appendStore('generated.json', generated)
     return json(res, 201, generated)
@@ -204,12 +205,12 @@ async function createCreative(body) {
   const product = products.find((item) => item.id === productId)
   if (!product?.imageUrl) throw clientError(404, 'PRODUCT_NOT_FOUND', '저장된 상품을 찾지 못했습니다.')
 
-  const imagePath = join(ROOT, 'data', product.imageUrl.replace(/^\//, '').replace('uploads/', 'uploads/'))
+  const imagePath = join(DATA_DIR, product.imageUrl.replace(/^\//, ''))
   const imageBuffer = await readFile(imagePath)
   const inputMime = MIME[extname(imagePath).toLowerCase()] || 'image/jpeg'
   const prompt = buildCreativePrompt({ ...body, productName: body.productName || product.name })
 
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+  const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -531,29 +532,6 @@ function clientFingerprint(req) {
   return createHash('sha256').update(`fitloop:${ip}`).digest('hex').slice(0, 24)
 }
 
-async function enforceDailyGenerationLimit() {
-  const today = koreaDay(new Date())
-  const generated = await readStore('generated.json')
-  const count = generated.filter((item) => koreaDay(new Date(item.createdAt)) === today).length
-  if (count >= GENERATION_LIMIT) {
-    throw clientError(
-      429,
-      'DAILY_GENERATION_LIMIT',
-      `하루 이미지 생성 한도(${GENERATION_LIMIT.toLocaleString('ko-KR')}장)를 사용했습니다.`,
-    )
-  }
-}
-
-function koreaDay(date) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
-}
-
 async function readStore(filename) {
   try {
     const contents = await readFile(join(DATA_DIR, filename), 'utf8')
@@ -720,11 +698,6 @@ function productPrice(value) {
   const normalized = typeof value === 'string' ? value.replace(/[^\d.]/g, '') : value
   const number = Number(normalized)
   return Number.isFinite(number) ? Math.min(100_000_000, Math.max(0, Math.round(number))) : null
-}
-
-function clampInt(value, min, max, fallback) {
-  const number = Number(value)
-  return Number.isFinite(number) ? Math.min(max, Math.max(min, Math.round(number))) : fallback
 }
 
 function extensionForMime(mime) {

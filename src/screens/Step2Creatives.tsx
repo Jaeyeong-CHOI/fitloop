@@ -4,6 +4,8 @@ import { generateCreative } from '../lib/api.ts'
 import { CREATIVES, type Creative } from '../lib/creatives.ts'
 import type { BackendHealth, GeneratedCreative, ProductRecord } from '../lib/types.ts'
 
+const PARALLEL_GENERATION_COUNT = 4
+
 interface Props {
   product: ProductRecord
   health: BackendHealth | null
@@ -28,6 +30,8 @@ export default function Step2Creatives({
   const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null)
   const [error, setError] = useState('')
   const autoGenerationStarted = useRef(false)
+  const batchRunning = useRef(false)
+  const workingIds = useRef(new Set<string>())
   const createAllRef = useRef<() => Promise<void>>(async () => {})
 
   useEffect(() => {
@@ -39,7 +43,8 @@ export default function Step2Creatives({
   const canGenerate = product.id !== 'demo' && Boolean(health?.geminiConfigured)
 
   const createOne = async (creative: Creative, showError = true) => {
-    if (!canGenerate || working.has(creative.id)) return false
+    if (!canGenerate || workingIds.current.has(creative.id)) return false
+    workingIds.current.add(creative.id)
     setWorking((current) => new Set(current).add(creative.id))
     if (showError) setError('')
     try {
@@ -57,6 +62,7 @@ export default function Step2Creatives({
       if (showError) setError(reason instanceof Error ? reason.message : '이미지를 생성하지 못했습니다.')
       return false
     } finally {
+      workingIds.current.delete(creative.id)
       setWorking((current) => {
         const next = new Set(current)
         next.delete(creative.id)
@@ -66,16 +72,30 @@ export default function Step2Creatives({
   }
 
   const createAll = async () => {
+    if (batchRunning.current) return
     const remaining = CREATIVES.filter((creative) => !generated[creative.id])
     if (!remaining.length) return
+    batchRunning.current = true
     setError('')
     setBatchProgress({ completed: 0, total: remaining.length })
+    let nextIndex = 0
+    let completed = 0
     let failed = 0
-    for (const [index, creative] of remaining.entries()) {
-      if (!(await createOne(creative, false))) failed++
-      setBatchProgress({ completed: index + 1, total: remaining.length })
+    const worker = async () => {
+      while (nextIndex < remaining.length) {
+        const creative = remaining[nextIndex++]
+        if (!(await createOne(creative, false))) failed++
+        completed++
+        setBatchProgress({ completed, total: remaining.length })
+      }
     }
-    setBatchProgress(null)
+    const workerCount = Math.min(PARALLEL_GENERATION_COUNT, remaining.length)
+    try {
+      await Promise.all(Array.from({ length: workerCount }, () => worker()))
+    } finally {
+      batchRunning.current = false
+      setBatchProgress(null)
+    }
     if (failed) setError(`${failed}개 시안 생성에 실패했습니다. 버튼을 눌러 실패한 시안만 다시 생성해 주세요.`)
   }
   createAllRef.current = createAll
@@ -95,8 +115,8 @@ export default function Step2Creatives({
             광고 시안 <span className="text-brand">24종 전체</span>를 AI로 생성합니다
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed break-keep text-sub">
-            모델 4종 × 배경 3종 × 카피 2종을 테스트합니다. 생성이 끝나는 순서대로 모든 카드에
-            실제 상품을 입힌 이미지가 표시됩니다.
+            모델 4종 × 배경 3종 × 카피 2종을 최대 4개씩 병렬 생성합니다. 완료되는 순서대로
+            모든 카드에 실제 상품을 입힌 이미지가 표시됩니다.
           </p>
         </div>
         <button
@@ -142,7 +162,7 @@ export default function Step2Creatives({
                 <button
                   type="button"
                   onClick={() => void createOne(creative)}
-                  disabled={!canGenerate || isWorking}
+                  disabled={!canGenerate || isWorking || batchProgress !== null}
                   className="absolute right-2 bottom-2 cursor-pointer rounded-full bg-white/90 px-2.5 py-1.5 text-[10px] font-semibold text-ink opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-100 focus:opacity-100 disabled:hidden"
                 >
                   {isWorking ? '생성 중…' : generatedCreative ? '다시 생성' : 'AI 생성'}
