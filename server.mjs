@@ -4,7 +4,7 @@ import { lookup } from 'node:dns/promises'
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { extractProductImageCandidates, extractProductTitle } from './lib/product-page.mjs'
+import { extractProductImageCandidates, extractProductPrice, extractProductTitle } from './lib/product-page.mjs'
 import {
   createCoupangAuthorization,
   extractCoupangProductId,
@@ -166,6 +166,7 @@ async function createProduct(body) {
   let image = null
   let sourceUrl
   let importedTitle = ''
+  let importedPrice = null
 
   if (typeof body.imageDataUrl === 'string' && body.imageDataUrl) {
     image = decodeDataUrl(body.imageDataUrl)
@@ -174,6 +175,7 @@ async function createProduct(body) {
     const imported = await importImageFromUrl(sourceUrl)
     image = imported.image
     importedTitle = imported.title
+    importedPrice = imported.price
   } else {
     throw clientError(400, 'PRODUCT_IMAGE_REQUIRED', '상품 이미지나 공개 상품 URL이 필요합니다.')
   }
@@ -185,7 +187,7 @@ async function createProduct(body) {
   return {
     id,
     name: cleanText(body.name, 80) || cleanText(importedTitle, 80) || '새 패션 상품',
-    price: clampInt(body.price, 0, 100_000_000, 32900),
+    price: productPrice(body.price) ?? importedPrice ?? 32900,
     category: cleanText(body.category, 60) || '패션',
     color: cleanText(body.color, 40) || '대표 컬러',
     fit: cleanText(body.fit, 40) || '기본 핏',
@@ -305,7 +307,7 @@ async function importImageFromUrl(rawUrl) {
 
   const contentType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase()
   if (contentType.startsWith('image/')) {
-    return { image: await responseToImage(response, contentType), title: '' }
+    return { image: await responseToImage(response, contentType), title: '', price: null }
   }
 
   const html = await readLimitedResponse(response, 3 * 1024 * 1024, '상품 페이지가 너무 큽니다.')
@@ -324,7 +326,7 @@ async function importImageFromUrl(rawUrl) {
       if (!imageResponse.ok) continue
       const imageType = (imageResponse.headers.get('content-type') || '').split(';')[0].toLowerCase()
       const image = await responseToImage(imageResponse, imageType)
-      return { image, title: extractProductTitle(text) }
+      return { image, title: extractProductTitle(text), price: extractProductPrice(text) }
     } catch (error) {
       if (error?.code === 'REMOTE_FILE_TOO_LARGE') throw error
     }
@@ -386,7 +388,11 @@ async function importCoupangProduct(rawUrl) {
   })
   if (!imageResponse.ok) throw clientError(422, 'PRODUCT_IMAGE_NOT_FOUND', '쿠팡 상품 이미지를 불러오지 못했습니다.')
   const imageType = (imageResponse.headers.get('content-type') || '').split(';')[0].toLowerCase()
-  return { image: await responseToImage(imageResponse, imageType), title: cleanText(product.productName, 160) }
+  return {
+    image: await responseToImage(imageResponse, imageType),
+    title: cleanText(product.productName, 160),
+    price: productPrice(product.productPrice),
+  }
 }
 
 async function importViaMetadataService(rawUrl) {
@@ -410,7 +416,7 @@ async function importViaMetadataService(rawUrl) {
     })
     if (!imageResponse.ok) return null
     const imageType = (imageResponse.headers.get('content-type') || '').split(';')[0].toLowerCase()
-    return { image: await responseToImage(imageResponse, imageType), title }
+    return { image: await responseToImage(imageResponse, imageType), title, price: productPrice(data?.price) }
   } catch (error) {
     if (error?.code === 'REMOTE_FILE_TOO_LARGE') throw error
     return null
@@ -721,6 +727,13 @@ function cleanText(value, maxLength) {
 function clampInt(value, min, max, fallback) {
   const number = Number(value)
   return Number.isFinite(number) ? Math.min(max, Math.max(min, Math.round(number))) : fallback
+}
+
+function productPrice(value) {
+  if (value === null || value === undefined || value === '') return null
+  const normalized = typeof value === 'string' ? value.replace(/[^\d.]/g, '') : value
+  const number = Number(normalized)
+  return Number.isFinite(number) ? Math.min(100_000_000, Math.max(0, Math.round(number))) : null
 }
 
 function extensionForMime(mime) {

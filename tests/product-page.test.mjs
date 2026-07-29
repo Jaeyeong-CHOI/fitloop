@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import {
   decodeHtmlEntities,
   extractProductImageCandidates,
+  extractProductPrice,
   extractProductTitle,
 } from '../lib/product-page.mjs'
 
@@ -16,6 +17,20 @@ test('prefers a relative Open Graph product image and decodes entities', () => {
   assert.equal(candidates[0].url, 'https://shop.example.com/products/cardigan.jpg?width=1200&quality=90')
   assert.equal(candidates[0].source, 'og:image')
   assert.equal(extractProductTitle(html), '니트 & 가디건')
+})
+
+test('extracts a product price from JSON-LD offers', () => {
+  const html = `<script type="application/ld+json">{
+    "@type":"Product",
+    "name":"데님 쇼츠",
+    "offers":{"@type":"Offer","price":"39,900","priceCurrency":"KRW"}
+  }</script>`
+  assert.equal(extractProductPrice(html), 39900)
+})
+
+test('supports product price metadata and embedded storefront prices', () => {
+  assert.equal(extractProductPrice('<meta property="product:price:amount" content="32,900원">'), 32900)
+  assert.equal(extractProductPrice('<script>window.item={"salePrice":27900}</script>'), 27900)
 })
 
 test('extracts a Product image array from JSON-LD before unrelated images', () => {

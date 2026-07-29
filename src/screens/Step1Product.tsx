@@ -33,11 +33,13 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
 
   const handleUrlSubmit = (event: FormEvent) => {
     event.preventDefault()
-    if (!url.trim()) {
+    const sourceUrl = url.match(/https?:\/\/[^\s]+/i)?.[0]?.replace(/[),.;]+$/, '') || ''
+    if (!sourceUrl) {
       setError('공개 상품 URL을 입력해 주세요.')
       return
     }
-    void importProduct({ sourceUrl: url.trim() })
+    setUrl(sourceUrl)
+    void importProduct({ sourceUrl })
   }
 
   const handleFile = (file?: File) => {
@@ -90,11 +92,12 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
           <>
             <form onSubmit={handleUrlSubmit} className="flex gap-2">
               <input
-                type="url"
+                type="text"
+                inputMode="url"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
                 disabled={phase === 'analyzing'}
-                placeholder="공개 상품 URL을 붙여넣으세요"
+                placeholder="쿠팡·무신사·스마트스토어 상품 URL"
                 className="h-12 min-w-0 flex-1 rounded-full border border-line bg-white px-5 text-sm outline-none placeholder:text-faint focus:border-brand focus:ring-2 focus:ring-brand/15"
               />
               <button
@@ -105,6 +108,9 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
                 가져오기
               </button>
             </form>
+            <p className="mt-2 px-2 text-left text-[11px] text-faint">
+              링크를 붙여넣으면 대표 이미지·상품명·가격을 자동으로 가져옵니다.
+            </p>
 
             <div className="my-5 flex items-center gap-3 text-xs text-faint">
               <div className="h-px flex-1 bg-line" />또는<div className="h-px flex-1 bg-line" />
@@ -190,6 +196,16 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
                     <span key={label} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-sub">{label}</span>
                   ))}
                 </div>
+                {product.sourceUrl && (
+                  <a
+                    href={product.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="mt-3 inline-flex text-xs font-medium text-brand hover:text-brand-deep"
+                  >
+                    원본 상품 페이지 열기 ↗
+                  </a>
+                )}
               </div>
             </div>
           </div>
