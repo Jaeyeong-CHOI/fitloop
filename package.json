@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "start": "NODE_ENV=production node server.mjs",
     "test:api": "node --test tests/*.test.mjs",
-    "qa:ui": "node scripts/qa-ui.mjs"
+    "qa:ui": "node scripts/qa-ui.mjs",
+    "qa:demo": "node scripts/qa-demo-static.mjs",
+    "video:demo": "node scripts/record-demo.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
