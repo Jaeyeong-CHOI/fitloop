@@ -1,0 +1,134 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    'Inter Tight', 'Pretendard Variable', Pretendard, system-ui, -apple-system,
+    'Segoe UI', sans-serif;
+
+  /* Fliption design tokens */
+  --color-ink: #030712; /* gray-950 primary text */
+  --color-sub: #6b7280; /* secondary text (readable) */
+  --color-faint: #9ca3af; /* muted text */
+  --color-line: #e5e7eb; /* border */
+  --color-brand: #f97316; /* orange accent */
+  --color-brand-deep: #ea580c; /* hover */
+  --color-brand-soft: #fff7ed; /* orange-50 wash */
+  --color-brand-mid: #fed7aa; /* orange-200 */
+
+  --radius-card: 1.25rem;
+
+  --shadow-soft: 0 1px 2px rgba(3, 7, 18, 0.04), 0 8px 24px rgba(3, 7, 18, 0.05);
+  --shadow-lift: 0 2px 4px rgba(3, 7, 18, 0.05), 0 16px 40px rgba(3, 7, 18, 0.08);
+
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-in: fade-in 0.4s ease both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #ffedd5;
+  color: #030712;
+}
+
+/* Range slider (budget) */
+input[type='range'].fl-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  outline: none;
+  background: transparent;
+}
+input[type='range'].fl-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    #f97316 0%,
+    #f97316 var(--fill, 50%),
+    #f3f4f6 var(--fill, 50%),
+    #f3f4f6 100%
+  );
+}
+input[type='range'].fl-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #f97316;
+  box-shadow: 0 2px 6px rgba(3, 7, 18, 0.15);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+input[type='range'].fl-range::-webkit-slider-thumb:hover {
+  transform: scale(1.08);
+}
+input[type='range'].fl-range::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: #f3f4f6;
+}
+input[type='range'].fl-range::-moz-range-progress {
+  height: 6px;
+  border-radius: 9999px;
+  background: #f97316;
+}
+input[type='range'].fl-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #f97316;
+  box-shadow: 0 2px 6px rgba(3, 7, 18, 0.15);
+  cursor: pointer;
+}
+
+/* Subtle shimmer for skeletons */
+@keyframes fl-shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.fl-skeleton {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 40%, #f3f4f6 55%);
+  background-size: 800px 100%;
+  animation: fl-shimmer 1.3s linear infinite;
+}
