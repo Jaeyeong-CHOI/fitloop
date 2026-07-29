@@ -86,25 +86,27 @@ export default function Step2Creatives({
     setError('')
     setBatchProgress({ completed: 0, total: remaining.length })
     setCopying(true)
-    try {
-      const result = await generateCopies({
-        productId: product.id,
-        productName: product.name,
-        combinations: CREATIVES.map((creative) => ({
-          creativeId: creative.id,
-          modelLabel: creative.model.label,
-          poseLabel: posePrompt(creative),
-          backgroundLabel: creative.background.label,
-        })),
+    const copyPromise = generateCopies({
+      productId: product.id,
+      productName: product.name,
+      combinations: CREATIVES.map((creative) => ({
+        creativeId: creative.id,
+        modelLabel: creative.model.label,
+        poseLabel: posePrompt(creative),
+        backgroundLabel: creative.background.label,
+      })),
+    })
+      .then((result) => {
+        applyCreativeCopies(
+          Object.fromEntries(result.copies.map((copy) => [copy.creativeId, copy.text])),
+        )
       })
-      applyCreativeCopies(
-        Object.fromEntries(result.copies.map((copy) => [copy.creativeId, copy.text])),
-      )
-    } catch {
-      setError('AI 카피 연결이 지연되어 기본 카피로 이미지를 생성합니다.')
-    } finally {
-      setCopying(false)
-    }
+      .catch(() => {
+        setError('AI 카피 연결이 지연되어 기본 카피로 이미지를 생성합니다.')
+      })
+      .finally(() => {
+        setCopying(false)
+      })
     let nextIndex = 0
     let completed = 0
     let failed = 0
@@ -118,7 +120,10 @@ export default function Step2Creatives({
     }
     const workerCount = Math.min(PARALLEL_GENERATION_COUNT, remaining.length)
     try {
-      await Promise.all(Array.from({ length: workerCount }, () => worker()))
+      await Promise.all([
+        copyPromise,
+        ...Array.from({ length: workerCount }, () => worker()),
+      ])
     } finally {
       batchRunning.current = false
       setBatchProgress(null)
@@ -163,9 +168,7 @@ export default function Step2Creatives({
         >
           {batchProgress ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : '✦'}
           {batchProgress
-            ? copying
-              ? 'AI 카피 자동 작성 중'
-              : `${batchProgress.completed}/${batchProgress.total} 생성 중`
+            ? `${batchProgress.completed}/${batchProgress.total} 생성 중${copying ? ' · 카피 동시 작성' : ''}`
             : generatedCount
               ? allGenerated
                 ? `${CREATIVES.length}종 생성 완료`

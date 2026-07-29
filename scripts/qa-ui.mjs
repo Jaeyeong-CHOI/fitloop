@@ -22,6 +22,50 @@ try {
     { name: 'mobile', width: 390, height: 844 },
   ]) {
     const page = await browser.newPage({ viewport })
+    await page.route('**/api/health', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          geminiConfigured: false,
+          imageModel: 'qa-static-assets',
+          generationLimit: null,
+          persistence: false,
+          deployment: 'static',
+        }),
+      }),
+    )
+    await page.route('**/api/products', (route) =>
+      route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'demo',
+          name: '데일리 크롭 니트 가디건',
+          price: 32900,
+          category: '여성 니트',
+          color: '아이보리',
+          fit: '크롭 핏',
+          imageUrl: null,
+          createdAt: new Date().toISOString(),
+        }),
+      }),
+    )
+    await page.route('**/api/campaigns', (route) =>
+      route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'qa-demo-campaign',
+          productId: 'demo',
+          settings: {},
+          generatedCreativeIds: [],
+          status: 'active',
+          createdAt: new Date().toISOString(),
+        }),
+      }),
+    )
     page.on('pageerror', (error) => errors.push(`${viewport.name}: ${error.message}`))
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(`${viewport.name}: ${message.text()}`)
@@ -70,6 +114,8 @@ try {
   const generatedModelLabels = new Set()
   const generatedCopyTexts = new Set()
   let copyRequest = null
+  let copyPending = false
+  let generationStartedWhileCopyPending = false
   let savedCampaign = null
   const pixel =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XwLzWQAAAABJRU5ErkJggg=='
@@ -107,6 +153,7 @@ try {
   )
   await page.route('**/api/creatives/generate', async (route) => {
     const input = route.request().postDataJSON()
+    if (copyPending) generationStartedWhileCopyPending = true
     generatedModelLabels.add(input.modelLabel)
     generatedCopyTexts.add(input.copyText)
     activeGenerations++
@@ -128,6 +175,9 @@ try {
   })
   await page.route('**/api/copies/generate', async (route) => {
     copyRequest = route.request().postDataJSON()
+    copyPending = true
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    copyPending = false
     await route.fulfill({
       status: 201,
       contentType: 'application/json',
@@ -182,6 +232,10 @@ try {
   assert.equal(copyRequest.combinations.length, 12)
   assert.equal(completedGenerations, 12)
   assert.equal(maxActiveGenerations, 12)
+  assert.ok(
+    generationStartedWhileCopyPending,
+    'image generation should start without waiting for automatic copy generation',
+  )
   assert.equal(generatedModelLabels.size, 4)
   assert.equal(generatedCopyTexts.size, 12)
   assert.ok(
