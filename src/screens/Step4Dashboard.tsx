@@ -297,7 +297,7 @@ function MiniGrid({
 function WeeklyReport({ sim, generated }: { sim: SimResult; generated: GeneratedMap }) {
   const { best, bestStat, totalSpend, totalRevenue, totalConversions, offCount, variantCount } =
     sim.summary
-  const bestName = `${best.model.label} × ${best.background.label} × ${best.copy.label}${
+  const bestName = `${best.model.label} × ${best.background.label}${
     best.variantNo ? ` (변형 v${best.variantNo})` : ''
   }`
   return (

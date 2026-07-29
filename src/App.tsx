@@ -6,7 +6,11 @@ import Step3Campaign, { type CampaignSettings } from './screens/Step3Campaign.ts
 import Step3Models from './screens/Step3Models.tsx'
 import Step4Dashboard from './screens/Step4Dashboard.tsx'
 import { getHealth, saveCampaign } from './lib/api.ts'
-import { applyModelProfiles } from './lib/creatives.ts'
+import {
+  applyModelProfiles,
+  creativeCopyMap,
+  resetCreativeCopies,
+} from './lib/creatives.ts'
 import {
   DEFAULT_MODEL_IDS,
   DEFAULT_SELECTION,
@@ -75,6 +79,7 @@ export default function App() {
     setGenerated({})
     setNotice('')
     setAutoGenerateCreatives(false)
+    resetCreativeCopies()
     const matchingModels = MODEL_LIBRARY.filter((model) => model.gender === inferredGender)
     setSettings((current) => ({ ...current, gender: inferredGender }))
     setModelSelection({ ...DEFAULT_SELECTION, genders: [inferredGender] })
@@ -91,6 +96,7 @@ export default function App() {
 
   const startCreativeGeneration = () => {
     applyModelProfiles(slotLabels(modelIds))
+    resetCreativeCopies()
     setGenerated({})
     setAutoGenerateCreatives(true)
     go(4)
@@ -101,7 +107,7 @@ export default function App() {
       try {
         const campaign = await saveCampaign({
           productId: product.id,
-          settings: { ...settings, modelIds },
+          settings: { ...settings, modelIds, creativeCopies: creativeCopyMap() },
           generatedCreativeIds: Object.values(generated).map((creative) => creative.id),
         })
         setNotice(

@@ -24,6 +24,7 @@ const PORT = Number(process.env.PORT || 5202)
 await Promise.all([mkdir(UPLOAD_DIR, { recursive: true }), mkdir(GENERATED_DIR, { recursive: true })])
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image'
+const COPY_MODEL = process.env.GEMINI_COPY_MODEL || 'gemini-3.1-flash-lite'
 const GEMINI_API_URL =
   process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/interactions'
 const METADATA_FALLBACK_URL = process.env.FITLOOP_METADATA_FALLBACK_URL || ''
@@ -94,6 +95,7 @@ async function handleApi(req, res, url) {
         process.env.COUPANG_PARTNERS_ACCESS_KEY && process.env.COUPANG_PARTNERS_SECRET_KEY,
       ),
       imageModel: IMAGE_MODEL,
+      copyModel: COPY_MODEL,
       generationLimit: null,
       persistence: true,
       deployment: 'server',
@@ -128,6 +130,17 @@ async function handleApi(req, res, url) {
     return json(res, 201, generated)
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/copies/generate') {
+    if (!process.env.GEMINI_API_KEY) {
+      return json(res, 503, {
+        error: 'COPY_GENERATION_NOT_CONFIGURED',
+        message: 'Gemini API 키가 아직 서버에 설정되지 않았습니다.',
+      })
+    }
+    const body = await readJson(req, 128 * 1024)
+    return json(res, 201, await createCreativeCopies(body))
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/campaigns') {
     rateLimit(req, 'campaign', 30, 60 * 60 * 1000)
     const body = await readJson(req, 256 * 1024)
@@ -139,7 +152,7 @@ async function handleApi(req, res, url) {
       productId: safeId(String(body.productId)),
       settings: body.settings,
       generatedCreativeIds: Array.isArray(body.generatedCreativeIds)
-        ? body.generatedCreativeIds.slice(0, 24).map((id) => safeId(String(id)))
+        ? body.generatedCreativeIds.slice(0, 12).map((id) => safeId(String(id)))
         : [],
       status: 'active',
       createdAt: new Date().toISOString(),
@@ -266,18 +279,163 @@ async function createCreative(body) {
     productId,
     imageUrl: `/generated/${filename}`,
     model: IMAGE_MODEL,
+    copyText: cleanText(body.copyText, 40),
     promptVersion: 1,
     createdAt: new Date().toISOString(),
   }
 }
 
+async function createCreativeCopies(body) {
+  const productId = safeId(String(body.productId || ''))
+  const products = await readStore('products.json')
+  const product = products.find((item) => item.id === productId)
+  if (!product) throw clientError(404, 'PRODUCT_NOT_FOUND', '저장된 상품을 찾지 못했습니다.')
+
+  const combinations = Array.isArray(body.combinations)
+    ? body.combinations
+        .slice(0, 12)
+        .map((item) => ({
+          creativeId: safeId(String(item?.creativeId || '')),
+          modelLabel: cleanText(item?.modelLabel, 60),
+          poseLabel: cleanText(item?.poseLabel, 40),
+          backgroundLabel: cleanText(item?.backgroundLabel, 40),
+        }))
+        .filter((item) => item.creativeId)
+    : []
+  if (!combinations.length) {
+    throw clientError(400, 'INVALID_COPY_REQUEST', '카피를 만들 시안 조합이 필요합니다.')
+  }
+
+  const fallbacks = fallbackCreativeCopies(product, combinations)
+  const prompt = [
+    `상품명: ${cleanText(body.productName, 80) || product.name}`,
+    `카테고리: ${product.category}`,
+    `색상: ${product.color}`,
+    `핏: ${product.fit}`,
+    '',
+    '아래 광고 시안 조합 각각에 어울리는 한국어 패션 광고 카피를 한 개씩 작성하세요.',
+    '각 카피는 12~26자, 한 문장, 서로 다른 표현이어야 합니다.',
+    '과장된 효능, 최저가, 1위, 무료, 보장 같은 검증 불가능한 표현과 해시태그는 사용하지 마세요.',
+    '상품명 자체를 반복하지 말고 착용 장면, 분위기, 핏의 매력을 자연스럽게 표현하세요.',
+    ...combinations.map(
+      (item) =>
+        `${item.creativeId}: ${item.modelLabel || '성인 모델'} / ${item.poseLabel || '자연스러운 포즈'} / ${item.backgroundLabel || '스튜디오'}`,
+    ),
+  ].join('\n')
+
+  try {
+    const response = await fetch(GEMINI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY,
+      },
+      body: JSON.stringify({
+        model: COPY_MODEL,
+        input: prompt,
+        response_format: {
+          type: 'text',
+          mime_type: 'application/json',
+          schema: {
+            type: 'object',
+            properties: {
+              copies: {
+                type: 'array',
+                minItems: combinations.length,
+                maxItems: combinations.length,
+                items: {
+                  type: 'object',
+                  properties: {
+                    creativeId: {
+                      type: 'string',
+                      enum: combinations.map((item) => item.creativeId),
+                    },
+                    text: {
+                      type: 'string',
+                      description: '12~26자의 자연스러운 한국어 패션 광고 카피',
+                    },
+                  },
+                  required: ['creativeId', 'text'],
+                },
+              },
+            },
+            required: ['copies'],
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(summarizeGeminiError(payload))
+    const parsed = JSON.parse(findTextOutput(payload) || '{}')
+    const received = new Map(
+      (Array.isArray(parsed.copies) ? parsed.copies : [])
+        .map((item) => [safeId(String(item?.creativeId || '')), normalizeCopy(item?.text)])
+        .filter(([creativeId, text]) => creativeId && text),
+    )
+    return {
+      copies: fallbacks.map((fallback) => ({
+        ...fallback,
+        text: received.get(fallback.creativeId) || fallback.text,
+      })),
+      model: COPY_MODEL,
+      source: received.size ? 'gemini' : 'fallback',
+    }
+  } catch (error) {
+    console.error('[fitloop] Gemini copy error', cleanText(error?.message, 300))
+    return { copies: fallbacks, model: COPY_MODEL, source: 'fallback' }
+  }
+}
+
+function fallbackCreativeCopies(product, combinations) {
+  const moods = [
+    '오늘 입고, 매일 손이 가는 핏',
+    '편안한 순간에도 선명한 실루엣',
+    '자연스럽게 완성되는 데일리 룩',
+    '움직일수록 살아나는 편안한 핏',
+    '가볍게 입어도 분위기는 또렷하게',
+    '일상에 자연스럽게 스며드는 스타일',
+    '단정한 핏으로 시작하는 하루',
+    '꾸민 듯 편안한 데일리 밸런스',
+    '어디서나 시선이 머무는 실루엣',
+    '내 움직임에 맞춘 자연스러운 핏',
+    '오늘의 분위기를 바꾸는 한 벌',
+    '평범한 거리도 화보처럼',
+  ]
+  const detail = cleanText(product.fit, 16)
+  return combinations.map((item, index) => ({
+    creativeId: item.creativeId,
+    text: index === 0 && detail ? `${detail}, 매일 손이 가는 이유` : moods[index % moods.length],
+  }))
+}
+
+function normalizeCopy(value) {
+  return cleanText(value, 40).replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim()
+}
+
+function findTextOutput(payload) {
+  if (typeof payload?.output_text === 'string') return payload.output_text
+  const pools = [payload?.outputs, payload?.steps, payload?.output]
+  for (const pool of pools) {
+    const items = Array.isArray(pool) ? [...pool].reverse() : pool ? [pool] : []
+    for (const item of items) {
+      if (typeof item?.text === 'string') return item.text
+      const content = Array.isArray(item?.content) ? item.content : []
+      const text = content.find((part) => part?.type === 'text' && typeof part.text === 'string')
+      if (text) return text.text
+    }
+  }
+  return ''
+}
+
 function buildCreativePrompt(input) {
   const product = cleanText(input.productName, 80) || 'fashion garment'
   const model = cleanText(input.modelLabel, 60) || 'adult fashion model'
+  const pose = cleanText(input.poseLabel, 40) || 'natural full-body pose'
   const background = cleanText(input.backgroundLabel, 60) || 'studio'
   return [
     `Create a premium Korean social-commerce fashion advertisement for ${product}.`,
-    `Use an adult ${model} model in a natural full-body pose, photographed in a ${background} setting.`,
+    `Use an adult ${model} model in a ${pose}, photographed in a ${background} setting.`,
     'The uploaded product is the exact garment reference. Preserve its silhouette, knit or fabric texture, color, buttons, seams, neckline, sleeve length, and proportions faithfully.',
     'Make the garment the visual focus, with realistic anatomy, believable fabric drape, natural hands, clean lighting, and a polished editorial look.',
     'Vertical 3:4 composition. Leave calm negative space near the bottom for a web overlay.',

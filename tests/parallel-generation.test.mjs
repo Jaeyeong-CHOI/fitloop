@@ -24,13 +24,24 @@ before(async () => {
     activeGeminiRequests++
     maxActiveGeminiRequests = Math.max(maxActiveGeminiRequests, activeGeminiRequests)
     try {
-      for await (const _chunk of req) {
-        // Drain the request before returning the mocked image.
-      }
+      const chunks = []
+      for await (const chunk of req) chunks.push(chunk)
+      const request = JSON.parse(Buffer.concat(chunks).toString('utf8'))
       await new Promise((resolve) => setTimeout(resolve, 40))
-      const body = JSON.stringify({
-        output: { type: 'image', mime_type: 'image/png', data: pixel },
-      })
+      const ids =
+        request.response_format?.schema?.properties?.copies?.items?.properties?.creativeId?.enum
+      const body = JSON.stringify(
+        request.response_format?.type === 'text'
+          ? {
+              output_text: JSON.stringify({
+                copies: ids.map((creativeId, index) => ({
+                  creativeId,
+                  text: `테스트 자동 카피 ${index + 1}`,
+                })),
+              }),
+            }
+          : { output: { type: 'image', mime_type: 'image/png', data: pixel } },
+      )
       res.writeHead(200, {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
@@ -66,7 +77,37 @@ after(async () => {
   if (dataDir) await rm(dataDir, { recursive: true, force: true })
 })
 
-test('24 concurrent generation requests are persisted without a daily limit', async () => {
+test('generates 12 structured ad copies in one Gemini request', async () => {
+  const productResponse = await fetch(`http://127.0.0.1:${appPort}/api/products`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageDataUrl: `data:image/png;base64,${pixel}` }),
+  })
+  const product = await productResponse.json()
+  const combinations = Array.from({ length: 12 }, (_, index) => ({
+    creativeId: `c${String(index + 1).padStart(2, '0')}`,
+    modelLabel: `남성 모델 ${index % 4}`,
+    poseLabel: `포즈 ${index % 4}`,
+    backgroundLabel: `배경 ${index % 3}`,
+  }))
+  const response = await fetch(`http://127.0.0.1:${appPort}/api/copies/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      productId: product.id,
+      productName: product.name,
+      combinations,
+    }),
+  })
+  const body = await response.json()
+
+  assert.equal(response.status, 201, appErrors)
+  assert.equal(body.source, 'gemini')
+  assert.equal(body.copies.length, 12)
+  assert.equal(new Set(body.copies.map((copy) => copy.text)).size, 12)
+})
+
+test('12 concurrent generation requests are persisted without a daily limit', async () => {
   const healthResponse = await fetch(`http://127.0.0.1:${appPort}/api/health`)
   const health = await healthResponse.json()
   assert.equal(health.generationLimit, null)
@@ -80,7 +121,7 @@ test('24 concurrent generation requests are persisted without a daily limit', as
   const product = await productResponse.json()
 
   const responses = await Promise.all(
-    Array.from({ length: 24 }, (_, index) =>
+    Array.from({ length: 12 }, (_, index) =>
       fetch(`http://127.0.0.1:${appPort}/api/creatives/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,15 +135,15 @@ test('24 concurrent generation requests are persisted without a daily limit', as
   )
   assert.deepEqual(
     responses.map((response) => response.status),
-    Array(24).fill(201),
+    Array(12).fill(201),
     appErrors,
   )
   assert.ok(maxActiveGeminiRequests > 1, 'Gemini requests were not handled concurrently')
 
   const generated = JSON.parse(await readFile(join(dataDir, 'generated.json'), 'utf8'))
-  assert.equal(generated.length, 24)
-  assert.equal(new Set(generated.map((item) => item.id)).size, 24)
-  assert.equal(new Set(generated.map((item) => item.creativeId)).size, 24)
+  assert.equal(generated.length, 12)
+  assert.equal(new Set(generated.map((item) => item.id)).size, 12)
+  assert.equal(new Set(generated.map((item) => item.creativeId)).size, 12)
 })
 
 async function waitForHealth() {

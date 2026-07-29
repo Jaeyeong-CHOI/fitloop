@@ -8,6 +8,7 @@ import {
   type LibraryModel,
   type ModelSelection,
 } from '../lib/models.ts'
+import { CREATIVES } from '../lib/creatives.ts'
 
 interface Props {
   selection: ModelSelection
@@ -69,7 +70,8 @@ export default function Step3Models({
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">어떤 모델이 입어볼까요?</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed break-keep text-sub">
             고객이 공감할 가상 모델을 고르세요. 성별·나이대·피부색·인종·체형으로 거르고,
-            최대 {MODEL_SLOTS}명까지 선택하면 각 모델과 배경, 카피를 조합해 착용샷을 만듭니다.
+            최대 {MODEL_SLOTS}명까지 선택하면 포즈 4종과 배경 3종을 조합해 착용샷을 만듭니다.
+            광고 카피는 상품에 맞춰 AI가 자동으로 작성합니다.
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-mid bg-brand-soft px-3.5 py-1.5 text-xs font-medium text-brand-deep">
@@ -174,8 +176,8 @@ export default function Step3Models({
           className="cursor-pointer rounded-full bg-brand px-10 py-4 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:bg-gray-200 disabled:text-faint disabled:shadow-none"
         >
           {selectedIds.length === 1
-            ? '이 모델로 시안 24종 만들기 →'
-            : `이 모델 ${selectedIds.length}명으로 시안 24종 만들기 →`}
+            ? `이 모델로 시안 ${CREATIVES.length}종 만들기 →`
+            : `이 모델 ${selectedIds.length}명으로 시안 ${CREATIVES.length}종 만들기 →`}
         </button>
       </div>
     </div>

@@ -56,7 +56,7 @@ export default function Step3Campaign({ settings, onChange, onNext }: Props) {
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">얼마로, 누구에게 보여줄까요?</h2>
         <p className="mt-2 text-sm leading-relaxed break-keep text-sub">
           예산과 광고 타겟을 먼저 정한 뒤, 다음 단계에서 고객이 공감할 가상 모델을 선택합니다.
-          생성된 24종 중 성과가 좋은 조합에 예산을 자동으로 몰아줍니다.
+          생성된 {CREATIVES.length}종 중 성과가 좋은 조합에 예산을 자동으로 몰아줍니다.
         </p>
       </div>
 

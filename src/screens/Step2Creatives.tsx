@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import CreativeVisual from '../components/CreativeVisual.tsx'
-import { generateCreative } from '../lib/api.ts'
-import { CREATIVES, type Creative } from '../lib/creatives.ts'
+import { generateCopies, generateCreative } from '../lib/api.ts'
+import {
+  applyCreativeCopies,
+  CREATIVES,
+  posePrompt,
+  type Creative,
+} from '../lib/creatives.ts'
 import type { BackendHealth, GeneratedCreative, ProductRecord } from '../lib/types.ts'
 
 const PARALLEL_GENERATION_COUNT = 12
@@ -28,6 +33,7 @@ export default function Step2Creatives({
   const [revealed, setRevealed] = useState(0)
   const [working, setWorking] = useState<Set<string>>(new Set())
   const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null)
+  const [copying, setCopying] = useState(false)
   const [error, setError] = useState('')
   const autoGenerationStarted = useRef(false)
   const batchRunning = useRef(false)
@@ -53,6 +59,7 @@ export default function Step2Creatives({
         creativeId: creative.id,
         productName: product.name,
         modelLabel: creative.model.label,
+        poseLabel: posePrompt(creative),
         backgroundLabel: creative.background.label,
         copyText: creative.copy.text,
       })
@@ -78,6 +85,26 @@ export default function Step2Creatives({
     batchRunning.current = true
     setError('')
     setBatchProgress({ completed: 0, total: remaining.length })
+    setCopying(true)
+    try {
+      const result = await generateCopies({
+        productId: product.id,
+        productName: product.name,
+        combinations: CREATIVES.map((creative) => ({
+          creativeId: creative.id,
+          modelLabel: creative.model.label,
+          poseLabel: posePrompt(creative),
+          backgroundLabel: creative.background.label,
+        })),
+      })
+      applyCreativeCopies(
+        Object.fromEntries(result.copies.map((copy) => [copy.creativeId, copy.text])),
+      )
+    } catch {
+      setError('AI 카피 연결이 지연되어 기본 카피로 이미지를 생성합니다.')
+    } finally {
+      setCopying(false)
+    }
     let nextIndex = 0
     let completed = 0
     let failed = 0
@@ -109,7 +136,6 @@ export default function Step2Creatives({
 
   const generatedCount = Object.keys(generated).length
   const allGenerated = generatedCount >= CREATIVES.length
-  const selectedModelCount = new Set(CREATIVES.map((creative) => creative.model.label)).size
 
   return (
     <div className="animate-fade-in mx-auto max-w-6xl pt-8 pb-6">
@@ -119,15 +145,14 @@ export default function Step2Creatives({
             {batchProgress ? (
               <>착용샷 시안을 <span className="text-brand">병렬 생성</span>하고 있어요</>
             ) : allGenerated ? (
-              <>AI가 광고 시안 <span className="text-brand">24종</span>을 생성했습니다</>
+              <>AI가 광고 시안 <span className="text-brand">{CREATIVES.length}종</span>을 생성했습니다</>
             ) : (
-              <>광고 시안 <span className="text-brand">24종 전체</span>를 AI로 생성합니다</>
+              <>광고 시안 <span className="text-brand">{CREATIVES.length}종 전체</span>를 AI로 생성합니다</>
             )}
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed break-keep text-sub">
-            {selectedModelCount === 1 ? '선택한 모델의 포즈 4종' : `선택한 모델 ${selectedModelCount}종`} ×
-            배경 3종 × 카피 2종을 최대 {PARALLEL_GENERATION_COUNT}개씩 초고속 병렬 생성합니다.
-            완료되는 순서대로 실제 착용샷이 표시됩니다.
+            포즈 4종 × 배경 3종을 조합하고, 상품에 맞는 광고 카피도 AI가 자동 작성합니다.
+            이미지 {CREATIVES.length}개는 동시에 초고속 병렬 생성됩니다.
           </p>
         </div>
         <button
@@ -138,12 +163,14 @@ export default function Step2Creatives({
         >
           {batchProgress ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : '✦'}
           {batchProgress
-            ? `${batchProgress.completed}/${batchProgress.total} 생성 중`
+            ? copying
+              ? 'AI 카피 자동 작성 중'
+              : `${batchProgress.completed}/${batchProgress.total} 생성 중`
             : generatedCount
               ? allGenerated
-                ? '24종 생성 완료'
+                ? `${CREATIVES.length}종 생성 완료`
                 : `남은 ${Math.max(0, CREATIVES.length - generatedCount)}종 AI 생성`
-              : '광고 시안 24종 전체 생성'}
+              : `광고 시안 ${CREATIVES.length}종 전체 생성`}
         </button>
       </div>
 

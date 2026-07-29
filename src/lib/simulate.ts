@@ -96,7 +96,7 @@ export interface SimSummary {
 
 export interface SimResult {
   days: DayResult[]
-  creatives: Creative[] // 원본 24 + 파생 (생성 순)
+  creatives: Creative[] // 원본 12 + 파생 (생성 순)
   summary: SimSummary
 }
 
@@ -196,7 +196,7 @@ export function runSimulation(dailyBudget: number, seed: number = DEFAULT_SEED):
   let cumSpend = 0
   let cumRevenue = 0
   let cumConv = 0
-  let variantSerial = 24
+  let variantSerial = CREATIVES.length
   const variantParentIds: string[] = []
 
   for (let day = 1; day <= SIM_DAYS; day++) {

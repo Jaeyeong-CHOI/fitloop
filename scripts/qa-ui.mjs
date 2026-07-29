@@ -49,7 +49,7 @@ try {
     await assertNoHorizontalOverflow(page, `${viewport.name} models`)
     await page.screenshot({ path: `${outputDir}/${viewport.name}-models.png`, fullPage: true })
 
-    await page.getByRole('button', { name: /이 모델 4명으로 시안 24종 만들기/ }).click()
+    await page.getByRole('button', { name: /이 모델 4명으로 시안 12종 만들기/ }).click()
     await page.getByRole('heading', { name: /광고 시안/ }).waitFor()
     await page.getByText(/샘플 상품에서는 준비된 데모 이미지/).waitFor()
     await page.waitForTimeout(1_000)
@@ -68,6 +68,8 @@ try {
   let completedGenerations = 0
   let maxActiveGenerations = 0
   const generatedModelLabels = new Set()
+  const generatedCopyTexts = new Set()
+  let copyRequest = null
   let savedCampaign = null
   const pixel =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XwLzWQAAAABJRU5ErkJggg=='
@@ -106,6 +108,7 @@ try {
   await page.route('**/api/creatives/generate', async (route) => {
     const input = route.request().postDataJSON()
     generatedModelLabels.add(input.modelLabel)
+    generatedCopyTexts.add(input.copyText)
     activeGenerations++
     maxActiveGenerations = Math.max(maxActiveGenerations, activeGenerations)
     await new Promise((resolve) => setTimeout(resolve, 60))
@@ -120,6 +123,21 @@ try {
         imageUrl: `https://generated.fitloop.test/${input.creativeId}.png`,
         model: 'qa-image-model',
         createdAt: new Date().toISOString(),
+      }),
+    })
+  })
+  await page.route('**/api/copies/generate', async (route) => {
+    copyRequest = route.request().postDataJSON()
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        copies: copyRequest.combinations.map((item, index) => ({
+          creativeId: item.creativeId,
+          text: `자동 카피 ${index + 1}`,
+        })),
+        model: 'qa-copy-model',
+        source: 'gemini',
       }),
     })
   })
@@ -156,14 +174,16 @@ try {
   await page.getByText('FL-M01').waitFor()
   assert.equal(await page.getByText(/^FL-W0/).count(), 0)
   await page.getByText('4/4명 선택됨').waitFor()
-  await page.getByRole('button', { name: /이 모델 4명으로 시안 24종 만들기/ }).click()
+  await page.getByRole('button', { name: /이 모델 4명으로 시안 12종 만들기/ }).click()
   await page.getByRole('heading', { name: /병렬 생성/ }).waitFor()
   assert.ok(await page.locator('[aria-label$="생성 대기 중"]').count())
-  await page.getByRole('button', { name: '24종 생성 완료' }).waitFor({ timeout: 10_000 })
+  await page.getByRole('button', { name: '12종 생성 완료' }).waitFor({ timeout: 10_000 })
 
-  assert.equal(completedGenerations, 24)
+  assert.equal(copyRequest.combinations.length, 12)
+  assert.equal(completedGenerations, 12)
   assert.equal(maxActiveGenerations, 12)
   assert.equal(generatedModelLabels.size, 4)
+  assert.equal(generatedCopyTexts.size, 12)
   assert.ok(
     [...generatedModelLabels].every((label) => label.startsWith('남성·')),
     'male targeting should only generate male model prompts',
@@ -176,12 +196,13 @@ try {
   )
   assert.equal(savedCampaign.settings.gender, '남성')
   assert.equal(savedCampaign.settings.modelIds.length, 4)
-  assert.equal(savedCampaign.generatedCreativeIds.length, 24)
+  assert.equal(Object.keys(savedCampaign.settings.creativeCopies).length, 12)
+  assert.equal(savedCampaign.generatedCreativeIds.length, 12)
   await page.close()
 
   assert.deepEqual(errors, [])
   console.log(`UI QA passed: ${baseUrl}`)
-  console.log(`Parallel generation QA passed: 24 requests, max concurrency ${maxActiveGenerations}`)
+  console.log(`Creative QA passed: 12 auto copies, 12 requests, max concurrency ${maxActiveGenerations}`)
   console.log(`Screenshots: ${outputDir}`)
 } finally {
   await browser.close()

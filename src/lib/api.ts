@@ -1,6 +1,7 @@
 import type {
   BackendHealth,
   CampaignRecord,
+  GeneratedCopyBatch,
   GeneratedCreative,
   ProductRecord,
 } from './types.ts'
@@ -95,6 +96,7 @@ export function generateCreative(input: {
   creativeId: string
   productName: string
   modelLabel: string
+  poseLabel: string
   backgroundLabel: string
   copyText: string
 }): Promise<GeneratedCreative> {
@@ -105,6 +107,25 @@ export function generateCreative(input: {
     method: 'POST',
     body: JSON.stringify(input),
   }).then(absoluteImageUrl)
+}
+
+export function generateCopies(input: {
+  productId: string
+  productName: string
+  combinations: Array<{
+    creativeId: string
+    modelLabel: string
+    poseLabel: string
+    backgroundLabel: string
+  }>
+}): Promise<GeneratedCopyBatch> {
+  if (STATIC_FALLBACK) {
+    return Promise.reject(new Error('GitHub Pages 정적 버전에서는 Gemini 카피 생성을 사용할 수 없습니다.'))
+  }
+  return request<GeneratedCopyBatch>('/api/copies/generate', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
 }
 
 export function saveCampaign(input: {

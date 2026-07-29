@@ -53,6 +53,17 @@ test('generation is disabled without a server key', async () => {
   assert.equal(body.error, 'IMAGE_GENERATION_NOT_CONFIGURED')
 })
 
+test('copy generation is disabled without a server key', async () => {
+  const response = await fetch(`http://127.0.0.1:${port}/api/copies/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productId: 'demo', combinations: [] }),
+  })
+  const body = await response.json()
+  assert.equal(response.status, 503)
+  assert.equal(body.error, 'COPY_GENERATION_NOT_CONFIGURED')
+})
+
 test('private URL imports are blocked', async () => {
   const response = await fetch(`http://127.0.0.1:${port}/api/products`, {
     method: 'POST',

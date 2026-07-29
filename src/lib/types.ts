@@ -14,6 +14,7 @@ export interface BackendHealth {
   ok: boolean
   geminiConfigured: boolean
   imageModel: string
+  copyModel?: string
   generationLimit?: number | null
   persistence: boolean
   deployment?: 'server' | 'static'
@@ -25,6 +26,18 @@ export interface GeneratedCreative {
   imageUrl: string
   model: string
   createdAt: string
+  copyText?: string
+}
+
+export interface GeneratedCopy {
+  creativeId: string
+  text: string
+}
+
+export interface GeneratedCopyBatch {
+  copies: GeneratedCopy[]
+  model: string
+  source: 'gemini' | 'fallback'
 }
 
 export interface CampaignRecord {

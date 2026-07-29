@@ -1,5 +1,6 @@
 /**
- * 광고 시안 매트릭스 정의: 모델 4종 × 배경 3종 × 카피 2종 = 24개 조합.
+ * 광고 시안 매트릭스 정의: 포즈/모델 4슬롯 × 배경 3종 = 12개 조합.
+ * 카피는 각 조합마다 Gemini가 자동 생성하고, API 실패 시 기본 카피를 사용한다.
  * trueCtr 은 시뮬레이션이 사용하는 "숨은 실제 성과"다 — 소수 승자 구조(0.3%~2.8%).
  */
 
@@ -18,13 +19,13 @@ export interface BackgroundDef {
 }
 
 export interface CopyDef {
-  id: 'A' | 'B'
+  id: 'AI'
   label: string
   text: string
 }
 
 export interface Creative {
-  id: string // c01 ~ c24
+  id: string // c01 ~ c12
   index: number // 0-based
   model: ModelDef
   background: BackgroundDef
@@ -46,11 +47,10 @@ export const MODELS: ModelDef[] = [
 ]
 
 export function applyModelProfiles(labels: string[]): void {
-  const oneModel = labels.length > 0 && labels.every((label) => label === labels[0])
   labels.forEach((label, index) => {
     if (!MODELS[index]) return
     MODELS[index].label = label
-    MODELS[index].short = oneModel ? `포즈${index + 1}` : `모델${index + 1}`
+    MODELS[index].short = `포즈${index + 1}`
   })
 }
 
@@ -60,40 +60,41 @@ export const BACKGROUNDS: BackgroundDef[] = [
   { id: 'b3', label: '스트릿', tone: [216, 16, 87] },
 ]
 
-export const COPIES: CopyDef[] = [
-  { id: 'A', label: '카피A', text: '포근함은 기본, 핏은 덤이에요' },
-  { id: 'B', label: '카피B', text: '출근부터 주말까지, 이 한 장이면' },
+const FALLBACK_COPIES = [
+  '오늘 입고, 매일 손이 가는 핏',
+  '카페에서도 자연스럽게 완성되는 룩',
+  '거리 위에서 더 살아나는 실루엣',
+  '편안한 순간에도 핏은 선명하게',
+  '일상에 가볍게 더하는 새로운 무드',
+  '걷는 순간까지 자연스러운 스타일',
+  '단정한 핏으로 시작하는 하루',
+  '꾸민 듯 편안한 데일리 밸런스',
+  '어디서나 시선이 머무는 실루엣',
+  '내 움직임에 맞춘 편안한 핏',
+  '오늘의 분위기를 바꾸는 한 벌',
+  '평범한 거리도 화보처럼',
 ]
 
+const POSE_PROMPTS: Record<ModelDef['pose'], string> = {
+  casual: 'relaxed front-facing standing pose',
+  street: 'dynamic walking pose with natural movement',
+  office: 'polished three-quarter pose with a confident posture',
+  plus: 'confident side-angle pose with one hand naturally placed',
+}
+
+export function posePrompt(creative: Creative): string {
+  return POSE_PROMPTS[creative.model.pose]
+}
+
 /**
- * trueCtr(%) 테이블 — [모델][배경][카피] 순.
- * 승자: 스트릿×카페×B(2.8), 스트릿×스트릿×B(2.3), 캐주얼×스튜디오×B(1.6)
+ * trueCtr(%) 테이블 — [포즈/모델][배경] 순.
+ * 승자: 포즈2×카페(2.8), 포즈2×스트릿(2.3), 포즈1×스튜디오(1.6)
  */
-const CTR_TABLE: number[][][] = [
-  // 20대 캐주얼      스튜디오        카페           스트릿
-  [
-    [0.9, 1.6],
-    [0.7, 1.1],
-    [0.5, 0.8],
-  ],
-  // 20대 스트릿
-  [
-    [0.8, 1.3],
-    [1.5, 2.8],
-    [1.0, 2.3],
-  ],
-  // 30대 오피스
-  [
-    [0.6, 0.9],
-    [1.2, 1.4],
-    [0.4, 0.5],
-  ],
-  // 플러스사이즈
-  [
-    [0.5, 0.7],
-    [0.6, 1.0],
-    [0.3, 0.4],
-  ],
+const CTR_TABLE: number[][] = [
+  [1.6, 1.1, 0.8],
+  [1.3, 2.8, 2.3],
+  [0.9, 1.4, 0.5],
+  [0.7, 1.0, 0.4],
 ]
 
 /** CVR은 CTR과 약하게 상관 — 잘 팔리는 시안이 전환도 좋다 */
@@ -110,27 +111,42 @@ export const CREATIVES: Creative[] = (() => {
   let i = 0
   for (let m = 0; m < MODELS.length; m++) {
     for (let b = 0; b < BACKGROUNDS.length; b++) {
-      for (let c = 0; c < COPIES.length; c++) {
-        const ctr = CTR_TABLE[m][b][c]
-        list.push({
-          id: `c${pad2(i + 1)}`,
-          index: i,
-          model: MODELS[m],
-          background: BACKGROUNDS[b],
-          copy: COPIES[c],
-          trueCtr: ctr,
-          trueCvr: cvrOf(ctr),
-        })
-        i++
-      }
+      const ctr = CTR_TABLE[m][b]
+      list.push({
+        id: `c${pad2(i + 1)}`,
+        index: i,
+        model: MODELS[m],
+        background: BACKGROUNDS[b],
+        copy: { id: 'AI', label: 'AI 카피', text: FALLBACK_COPIES[i] },
+        trueCtr: ctr,
+        trueCvr: cvrOf(ctr),
+      })
+      i++
     }
   }
   return list
 })()
 
-/** "스트릿 · 카페 · B" 형태의 짧은 라벨 */
+export function applyCreativeCopies(copies: Record<string, string>): void {
+  CREATIVES.forEach((creative) => {
+    const text = copies[creative.id]?.trim()
+    if (text) creative.copy.text = text
+  })
+}
+
+export function resetCreativeCopies(): void {
+  CREATIVES.forEach((creative, index) => {
+    creative.copy.text = FALLBACK_COPIES[index]
+  })
+}
+
+export function creativeCopyMap(): Record<string, string> {
+  return Object.fromEntries(CREATIVES.map((creative) => [creative.id, creative.copy.text]))
+}
+
+/** "포즈2 · 카페" 형태의 짧은 라벨 */
 export function shortLabel(cr: Creative): string {
-  const base = `${cr.model.short}·${cr.background.label}·${cr.copy.id}`
+  const base = `${cr.model.short}·${cr.background.label}`
   return cr.variantNo ? `${base} v${cr.variantNo}` : base
 }
 
