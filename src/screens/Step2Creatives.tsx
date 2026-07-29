@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import CreativeVisual from '../components/CreativeVisual.tsx'
 import { generateCreative } from '../lib/api.ts'
 import { CREATIVES, type Creative } from '../lib/creatives.ts'
@@ -12,11 +12,10 @@ interface Props {
   onNext: () => void
 }
 
-const FEATURED_IDS = new Set(['c02', 'c10', 'c16', 'c22'])
-
 export default function Step2Creatives({ product, health, generated, onGenerated, onNext }: Props) {
   const [revealed, setRevealed] = useState(0)
   const [working, setWorking] = useState<Set<string>>(new Set())
+  const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -25,13 +24,12 @@ export default function Step2Creatives({ product, health, generated, onGenerated
     return () => window.clearTimeout(timer)
   }, [revealed])
 
-  const featured = useMemo(() => CREATIVES.filter((creative) => FEATURED_IDS.has(creative.id)), [])
   const canGenerate = product.id !== 'demo' && Boolean(health?.geminiConfigured)
 
-  const createOne = async (creative: Creative) => {
-    if (!canGenerate || working.has(creative.id)) return
+  const createOne = async (creative: Creative, showError = true) => {
+    if (!canGenerate || working.has(creative.id)) return false
     setWorking((current) => new Set(current).add(creative.id))
-    setError('')
+    if (showError) setError('')
     try {
       const result = await generateCreative({
         productId: product.id,
@@ -42,8 +40,10 @@ export default function Step2Creatives({ product, health, generated, onGenerated
         copyText: creative.copy.text,
       })
       onGenerated(result)
+      return true
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '이미지를 생성하지 못했습니다.')
+      if (showError) setError(reason instanceof Error ? reason.message : '이미지를 생성하지 못했습니다.')
+      return false
     } finally {
       setWorking((current) => {
         const next = new Set(current)
@@ -53,10 +53,18 @@ export default function Step2Creatives({ product, health, generated, onGenerated
     }
   }
 
-  const createFeatured = async () => {
-    for (const creative of featured) {
-      if (!generated[creative.id]) await createOne(creative)
+  const createAll = async () => {
+    const remaining = CREATIVES.filter((creative) => !generated[creative.id])
+    if (!remaining.length) return
+    setError('')
+    setBatchProgress({ completed: 0, total: remaining.length })
+    let failed = 0
+    for (const [index, creative] of remaining.entries()) {
+      if (!(await createOne(creative, false))) failed++
+      setBatchProgress({ completed: index + 1, total: remaining.length })
     }
+    setBatchProgress(null)
+    if (failed) setError(`${failed}개 시안 생성에 실패했습니다. 버튼을 눌러 실패한 시안만 다시 생성해 주세요.`)
   }
 
   return (
@@ -67,18 +75,22 @@ export default function Step2Creatives({ product, health, generated, onGenerated
             광고 시안 <span className="text-brand">24종</span>을 준비했습니다
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed break-keep text-sub">
-            모델 4종 × 배경 3종 × 카피 2종을 테스트합니다. 각 카드의 AI 생성 버튼으로 실제
-            상품을 입힌 광고 이미지를 만들 수 있습니다.
+            모델 4종 × 배경 3종 × 카피 2종을 테스트합니다. 버튼 한 번으로 실제 상품을 입힌
+            광고 이미지 24종을 모두 생성합니다.
           </p>
         </div>
         <button
           type="button"
-          onClick={() => void createFeatured()}
-          disabled={!canGenerate || working.size > 0}
+          onClick={() => void createAll()}
+          disabled={!canGenerate || batchProgress !== null || working.size > 0}
           className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-ink px-5 py-3 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-default disabled:bg-gray-200 disabled:text-faint"
         >
-          {working.size > 0 ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : '✦'}
-          대표 시안 4종 AI 생성
+          {batchProgress ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : '✦'}
+          {batchProgress
+            ? `${batchProgress.completed}/${batchProgress.total} 생성 중`
+            : Object.keys(generated).length
+              ? `남은 ${Math.max(0, CREATIVES.length - Object.keys(generated).length)}종 AI 생성`
+              : '24종 모두 AI 생성'}
         </button>
       </div>
 
@@ -127,7 +139,7 @@ export default function Step2Creatives({ product, health, generated, onGenerated
             ? '캠페인 설정은 이 브라우저에만 임시 저장됩니다.'
             : '생성된 시안과 캠페인 설정은 서버에 저장됩니다.'}
         </p>
-        <button type="button" onClick={onNext} disabled={revealed < CREATIVES.length} className="cursor-pointer rounded-full bg-brand px-8 py-3.5 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:opacity-40">
+        <button type="button" onClick={onNext} disabled={revealed < CREATIVES.length || batchProgress !== null} className="cursor-pointer rounded-full bg-brand px-8 py-3.5 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:opacity-40">
           이 시안으로 집행 설정하기 →
         </button>
       </div>

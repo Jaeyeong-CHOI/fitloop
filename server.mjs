@@ -23,7 +23,7 @@ await loadEnv(join(ROOT, '.env'))
 await Promise.all([mkdir(UPLOAD_DIR, { recursive: true }), mkdir(GENERATED_DIR, { recursive: true })])
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image'
-const GENERATION_LIMIT = clampInt(process.env.FITLOOP_DAILY_GENERATION_LIMIT, 1, 50, 5)
+const GENERATION_LIMIT = clampInt(process.env.FITLOOP_DAILY_GENERATION_LIMIT, 1, 50, 30)
 const METADATA_FALLBACK_URL = process.env.FITLOOP_METADATA_FALLBACK_URL || ''
 const ALLOWED_ORIGINS = new Set(
   (process.env.FITLOOP_ALLOWED_ORIGINS ||
@@ -119,11 +119,16 @@ async function handleApi(req, res, url) {
         message: 'Gemini API 키가 아직 서버에 설정되지 않았습니다.',
       })
     }
-    await enforceDailyGenerationLimit(req)
     const body = await readJson(req, 128 * 1024)
-    const generated = await createCreative(body)
-    await appendStore('generated.json', generated)
-    return json(res, 201, generated)
+    const reservation = await reserveDailyGeneration(req)
+    try {
+      const generated = await createCreative(body)
+      await appendStore('generated.json', generated)
+      return json(res, 201, generated)
+    } catch (error) {
+      await releaseDailyGeneration(reservation)
+      throw error
+    }
   }
 
   if (req.method === 'POST' && url.pathname === '/api/campaigns') {
@@ -517,7 +522,7 @@ function rateLimit(req, bucket, limit, windowMs) {
   current.count++
 }
 
-async function enforceDailyGenerationLimit(req) {
+async function reserveDailyGeneration(req) {
   const day = new Date().toISOString().slice(0, 10)
   const fingerprint = clientFingerprint(req)
   await mutateStore('usage.json', (items) => {
@@ -530,6 +535,19 @@ async function enforceDailyGenerationLimit(req) {
     else retained.push({ day, fingerprint, count: 1 })
     return retained
   })
+  return { day, fingerprint }
+}
+
+async function releaseDailyGeneration({ day, fingerprint }) {
+  await mutateStore('usage.json', (items) =>
+    items
+      .map((item) =>
+        item.day === day && item.fingerprint === fingerprint
+          ? { ...item, count: Math.max(0, item.count - 1) }
+          : item,
+      )
+      .filter((item) => item.count > 0),
+  )
 }
 
 function clientFingerprint(req) {
@@ -556,7 +574,7 @@ async function appendStore(filename, item) {
 
 async function mutateStore(filename, mutate) {
   let result
-  storeQueue = storeQueue.then(async () => {
+  const operation = storeQueue.catch(() => {}).then(async () => {
     const items = await readStore(filename)
     result = mutate(items)
     const destination = join(DATA_DIR, filename)
@@ -564,7 +582,8 @@ async function mutateStore(filename, mutate) {
     await writeFile(temporary, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 })
     await rename(temporary, destination)
   })
-  await storeQueue
+  storeQueue = operation.catch(() => {})
+  await operation
   return result
 }
 
