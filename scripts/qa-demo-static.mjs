@@ -7,7 +7,13 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 const errors = []
 page.on('pageerror', (error) => errors.push(error.message))
 page.on('console', (message) => {
-  if (message.type() === 'error') errors.push(message.text())
+  if (message.type() !== 'error') return
+  const text = message.text()
+  if (
+    text.includes('static.cloudflareinsights.com/beacon.min.js') &&
+    text.includes('violates the following Content Security Policy')
+  ) return
+  errors.push(text)
 })
 
 try {
