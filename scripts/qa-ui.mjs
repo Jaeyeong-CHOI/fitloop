@@ -8,6 +8,7 @@ await mkdir(outputDir, { recursive: true })
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const errors = []
+const apiRequests = []
 
 async function assertNoHorizontalOverflow(page, label) {
   const overflow = await page.evaluate(
@@ -22,82 +23,49 @@ try {
     { name: 'mobile', width: 390, height: 844 },
   ]) {
     const page = await browser.newPage({ viewport })
-    await page.route('**/api/health', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          geminiConfigured: false,
-          imageModel: 'qa-static-assets',
-          generationLimit: null,
-          persistence: false,
-          deployment: 'static',
-        }),
-      }),
-    )
-    await page.route('**/api/products', (route) =>
-      route.fulfill({
-        status: 201,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 'demo',
-          name: '데일리 크롭 니트 가디건',
-          price: 32900,
-          category: '여성 니트',
-          color: '아이보리',
-          fit: '크롭 핏',
-          imageUrl: '/creatives/c01.jpg',
-          createdAt: new Date().toISOString(),
-        }),
-      }),
-    )
-    await page.route('**/api/campaigns', (route) =>
-      route.fulfill({
-        status: 201,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 'qa-demo-campaign',
-          productId: 'demo',
-          settings: {},
-          generatedCreativeIds: [],
-          status: 'active',
-          createdAt: new Date().toISOString(),
-        }),
-      }),
-    )
     page.on('pageerror', (error) => errors.push(`${viewport.name}: ${error.message}`))
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(`${viewport.name}: ${message.text()}`)
     })
+    page.on('request', (request) => {
+      const url = request.url()
+      if (url.includes('fitloop-api.jaeyeong2026.com') || /\/api\//.test(url)) {
+        apiRequests.push(`${viewport.name}: ${url}`)
+      }
+    })
 
     const response = await page.goto(baseUrl, { waitUntil: 'networkidle' })
     assert.equal(response?.status(), 200)
-    await page.getByRole('heading', { name: /옷 사진 한 장이면/ }).waitFor()
+    await page.getByRole('heading', { name: /광고 이미지를 만들고/ }).waitFor()
+    await page.getByRole('heading', { name: '발표 자료' }).waitFor()
+    assert.equal(await page.locator('a[href*="1UOGJYSpfCsh4xOfomOjYhEwiagRyYfKU"]').count(), 1)
+    assert.equal(await page.locator('a[href*="1k1WqSfDgRtHlcvq_XQFge2MrCB6QbBw1"]').count(), 1)
+    assert.equal(await page.locator('img[src*="/presentations/"]').count(), 2)
+    await assertNoHorizontalOverflow(page, `${viewport.name} portfolio`)
+    await page.screenshot({ path: `${outputDir}/${viewport.name}-portfolio.png`, fullPage: true })
 
-    await assertNoHorizontalOverflow(page, `${viewport.name} home`)
-    await page.screenshot({ path: `${outputDir}/${viewport.name}-home.png`, fullPage: true })
+    await page.getByRole('button', { name: '데모 체험' }).click()
+    await page.getByRole('heading', { name: /옷 사진 한 장이면/ }).waitFor()
+    await page.getByText(/외부 이미지 생성 API 없이/).waitFor()
+    await assertNoHorizontalOverflow(page, `${viewport.name} demo home`)
 
     await page.getByPlaceholder(/상품 URL/).fill('https://www.musinsa.com/products/4672509')
     await page.getByRole('button', { name: '가져오기' }).click()
     await page.getByText('상품 분석 완료').waitFor()
     await page.getByRole('button', { name: /예산과 타겟 정하러 가기/ }).click()
     await page.getByRole('heading', { name: /얼마로, 누구에게/ }).waitFor()
-    await page.waitForTimeout(600)
     await assertNoHorizontalOverflow(page, `${viewport.name} campaign`)
-    await page.screenshot({ path: `${outputDir}/${viewport.name}-campaign.png`, fullPage: true })
 
     await page.getByRole('button', { name: /모델 고르러 가기/ }).click()
     await page.getByRole('heading', { name: /어떤 모델이 입어볼까요/ }).waitFor()
     await page.getByText('4/4명 선택됨').waitFor()
-    await page.waitForTimeout(600)
     await assertNoHorizontalOverflow(page, `${viewport.name} models`)
-    await page.screenshot({ path: `${outputDir}/${viewport.name}-models.png`, fullPage: true })
 
     await page.getByRole('button', { name: /이 모델 4명으로 시안 12종 만들기/ }).click()
-    await page.getByRole('heading', { name: /광고 시안/ }).waitFor()
-    await page.getByText(/광고 시안 12종을 구성/).waitFor()
-    await page.waitForTimeout(1_000)
+    await page.getByRole('heading', { name: /예시 광고 시안 12종/ }).waitFor()
+    await page.getByText(/미리 준비된 예시 광고 시안 12종/).waitFor()
+    await page.waitForTimeout(600)
+    assert.equal(await page.locator('img[src*="/creatives/"]').count(), 12)
     await assertNoHorizontalOverflow(page, `${viewport.name} creatives`)
     await page.screenshot({ path: `${outputDir}/${viewport.name}-creatives.png`, fullPage: true })
 
@@ -108,156 +76,10 @@ try {
     await page.close()
   }
 
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
-  let activeGenerations = 0
-  let completedGenerations = 0
-  let maxActiveGenerations = 0
-  const generatedModelLabels = new Set()
-  const generatedCopyTexts = new Set()
-  let copyRequest = null
-  let copyPending = false
-  let generationStartedWhileCopyPending = false
-  let savedCampaign = null
-  const pixel =
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XwLzWQAAAABJRU5ErkJggg=='
-
-  await page.route('**/api/health', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        geminiConfigured: true,
-        imageModel: 'qa-image-model',
-        generationLimit: null,
-        persistence: true,
-        deployment: 'server',
-      }),
-    }),
-  )
-  await page.route('**/api/products', (route) =>
-    route.fulfill({
-      status: 201,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: 'qa-product',
-        name: '병렬 생성 테스트 상품',
-        price: 32900,
-        category: '패션',
-        color: '블랙',
-        fit: '기본 핏',
-        imageUrl: pixel,
-        sourceUrl: 'https://example.com/product',
-        createdAt: new Date().toISOString(),
-      }),
-    }),
-  )
-  await page.route('**/api/creatives/generate', async (route) => {
-    const input = route.request().postDataJSON()
-    if (copyPending) generationStartedWhileCopyPending = true
-    generatedModelLabels.add(input.modelLabel)
-    generatedCopyTexts.add(input.copyText)
-    activeGenerations++
-    maxActiveGenerations = Math.max(maxActiveGenerations, activeGenerations)
-    await new Promise((resolve) => setTimeout(resolve, 60))
-    completedGenerations++
-    activeGenerations--
-    await route.fulfill({
-      status: 201,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: `generated-${input.creativeId}`,
-        creativeId: input.creativeId,
-        imageUrl: `https://generated.fitloop.test/${input.creativeId}.png`,
-        model: 'qa-image-model',
-        createdAt: new Date().toISOString(),
-      }),
-    })
-  })
-  await page.route('**/api/copies/generate', async (route) => {
-    copyRequest = route.request().postDataJSON()
-    copyPending = true
-    await new Promise((resolve) => setTimeout(resolve, 250))
-    copyPending = false
-    await route.fulfill({
-      status: 201,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        copies: copyRequest.combinations.map((item, index) => ({
-          creativeId: item.creativeId,
-          text: `자동 카피 ${index + 1}`,
-        })),
-        model: 'qa-copy-model',
-        source: 'gemini',
-      }),
-    })
-  })
-  await page.route('https://generated.fitloop.test/**', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'image/png',
-      body: Buffer.from(pixel.split(',')[1], 'base64'),
-    }),
-  )
-  await page.route('**/api/campaigns', async (route) => {
-    savedCampaign = route.request().postDataJSON()
-    await route.fulfill({
-      status: 201,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: 'qa-campaign',
-        productId: savedCampaign.productId,
-        settings: savedCampaign.settings,
-        generatedCreativeIds: savedCampaign.generatedCreativeIds,
-        status: 'active',
-        createdAt: new Date().toISOString(),
-      }),
-    })
-  })
-
-  await page.goto(baseUrl, { waitUntil: 'networkidle' })
-  await page.getByPlaceholder(/상품 URL/).fill('https://example.com/product')
-  await page.getByRole('button', { name: '가져오기' }).click()
-  await page.getByText(/상품 준비 완료/).waitFor()
-  await page.getByRole('button', { name: /예산과 타겟 정하러 가기/ }).click()
-  await page.getByRole('button', { name: '남성', exact: true }).click()
-  await page.getByRole('button', { name: /모델 고르러 가기/ }).click()
-  await page.getByText('FL-M01').waitFor()
-  assert.equal(await page.getByText(/^FL-W0/).count(), 0)
-  await page.getByText('4/4명 선택됨').waitFor()
-  await page.getByRole('button', { name: /이 모델 4명으로 시안 12종 만들기/ }).click()
-  await page.getByRole('heading', { name: /병렬 생성/ }).waitFor()
-  assert.ok(await page.locator('[aria-label$="생성 대기 중"]').count())
-  await page.getByRole('button', { name: '12종 생성 완료' }).waitFor({ timeout: 10_000 })
-
-  assert.equal(copyRequest.combinations.length, 12)
-  assert.equal(completedGenerations, 12)
-  assert.equal(maxActiveGenerations, 12)
-  assert.ok(
-    generationStartedWhileCopyPending,
-    'image generation should start without waiting for automatic copy generation',
-  )
-  assert.equal(generatedModelLabels.size, 4)
-  assert.equal(generatedCopyTexts.size, 12)
-  assert.ok(
-    [...generatedModelLabels].every((label) => label.startsWith('남성·')),
-    'male targeting should only generate male model prompts',
-  )
-  await page.getByRole('button', { name: /이 시안으로 광고 시작하기/ }).click()
-  await page.getByRole('heading', { name: '성과 대시보드' }).waitFor()
-  assert.ok(
-    (await page.locator('img[src^="https://generated.fitloop.test/"]').count()) > 0,
-    'dashboard should reuse images generated in the creative step',
-  )
-  assert.equal(savedCampaign.settings.gender, '남성')
-  assert.equal(savedCampaign.settings.modelIds.length, 4)
-  assert.equal(Object.keys(savedCampaign.settings.creativeCopies).length, 12)
-  assert.equal(savedCampaign.generatedCreativeIds.length, 12)
-  await page.close()
-
+  assert.deepEqual(apiRequests, [], `static portfolio made API requests:\n${apiRequests.join('\n')}`)
   assert.deepEqual(errors, [])
-  console.log(`UI QA passed: ${baseUrl}`)
-  console.log(`Creative QA passed: 12 auto copies, 12 requests, max concurrency ${maxActiveGenerations}`)
+  console.log(`Static portfolio QA passed: ${baseUrl}`)
+  console.log(`No API requests observed across desktop and mobile flows`)
   console.log(`Screenshots: ${outputDir}`)
 } finally {
   await browser.close()

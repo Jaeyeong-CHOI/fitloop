@@ -148,22 +148,25 @@ export default function Step2Creatives({
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            {batchProgress ? (
+            {staticReady ? (
+              <>예시 광고 시안 <span className="text-brand">{CREATIVES.length}종</span>을 준비했습니다</>
+            ) : batchProgress ? (
               <>착용샷 시안을 <span className="text-brand">병렬 생성</span>하고 있어요</>
-            ) : allGenerated || staticReady ? (
+            ) : allGenerated ? (
               <>AI가 광고 시안 <span className="text-brand">{CREATIVES.length}종</span>을 생성했습니다</>
             ) : (
               <>광고 시안 <span className="text-brand">{CREATIVES.length}종 전체</span>를 AI로 생성합니다</>
             )}
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed break-keep text-sub">
-            포즈 4종 × 배경 3종을 조합하고, 상품에 맞는 광고 카피도 AI가 자동 작성합니다.
-            이미지 {CREATIVES.length}개는 동시에 초고속 병렬 생성됩니다.
+            {staticReady
+              ? '포즈 4종 × 배경 3종으로 구성한 정적 데모 이미지입니다. 각 조합의 성과가 어떻게 달라지는지 다음 단계에서 확인할 수 있습니다.'
+              : `포즈 4종 × 배경 3종을 조합하고, 상품에 맞는 광고 카피도 AI가 자동 작성합니다. 이미지 ${CREATIVES.length}개는 동시에 초고속 병렬 생성됩니다.`}
           </p>
         </div>
         {staticReady ? (
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-xs font-semibold text-white shadow-soft">
-            ✓ 광고 시안 {CREATIVES.length}종 생성 완료
+            ✓ 예시 데모 이미지 {CREATIVES.length}종
           </span>
         ) : (
           <button
@@ -193,7 +196,7 @@ export default function Step2Creatives({
           {product.id === 'demo'
             ? '상품 분석 결과를 바탕으로 포즈 4종 × 배경 3종의 광고 시안 12종을 구성했습니다.'
             : staticReady
-              ? '상품 분석 결과를 바탕으로 포즈 4종 × 배경 3종의 광고 시안 12종을 구성했습니다.'
+              ? '외부 이미지 생성 API를 호출하지 않고, 미리 준비된 예시 광고 시안 12종을 보여드립니다.'
               : '이미지 생성 서버가 연결되면 AI 생성 버튼이 활성화됩니다. 현재 시안으로 캠페인을 계속 구성할 수 있습니다.'}
         </div>
       )}
@@ -234,7 +237,7 @@ export default function Step2Creatives({
       <div className="mt-9 flex flex-col items-center gap-3 pb-4">
         <p className="text-xs text-faint">
           {health?.deployment === 'static'
-            ? '캠페인 설정은 이 브라우저에만 임시 저장됩니다.'
+            ? '정적 데모의 캠페인 설정은 이 브라우저에만 임시 저장됩니다.'
             : '생성된 시안과 캠페인 설정은 서버에 저장됩니다.'}
         </p>
         <button type="button" onClick={onNext} disabled={revealed < CREATIVES.length || batchProgress !== null} className="cursor-pointer rounded-full bg-brand px-8 py-3.5 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:opacity-40">

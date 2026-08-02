@@ -1,13 +1,13 @@
-# FitLoop (핏루프) — 1인 셀러를 위한 AI 마케터 · GRAFFITI 2026 데모
+# FitLoop (핏루프) — GRAFFITI 2026 프로젝트 포트폴리오
 
 옷 사진 한 장을 받으면 ① 가상 피팅으로 착용샷 광고 시안을 대량 생성하고 ② 인스타/네이버에
 소액 분산 집행한 뒤 ③ 성과 좋은 시안은 변형 증식, 나쁜 시안은 자동 오프하며 예산을
 재배분하는 루프를 자동화하는 서비스의 발표용 데모 웹앱입니다.
 
-현재 프로덕션 프론트엔드는 GitHub Pages에서 제공하고, 업로드·캠페인 저장·Gemini 생성 API는
-맥미니의 `fitloop-api.jaeyeong2026.com` 백엔드가 담당합니다. Gemini 키는 macOS Keychain에서
-런타임에만 읽으며 GitHub 저장소나 브라우저 번들에는 포함하지 않습니다.
-**예산 배분 알고리즘(톰슨 샘플링)은 실제로 계산**됩니다. Powered by Fliption Virtual Try-on.
+현재 공개 사이트는 GitHub Pages에서 제공하는 **API 없는 정적 포트폴리오**입니다. 첫 화면에서
+프로젝트 배경·검증 결과·발표 덱·A2 포스터를 확인할 수 있고, 인터랙티브 데모는 미리 준비된
+광고 이미지와 브라우저 로컬 상태만으로 동작합니다. 외부 Gemini/Nano Banana API를 호출하지
+않습니다. **예산 배분 알고리즘(톰슨 샘플링)은 브라우저에서 실제로 계산**됩니다.
 
 프로덕션: <https://fitloop.jaeyeong2026.com>
 
@@ -15,57 +15,27 @@
 
 ```bash
 npm install
-npm run dev:server # 백엔드: http://127.0.0.1:5202
-npm run dev        # 프론트: http://localhost:5173
+VITE_STATIC_DEPLOYMENT=true npm run dev
 ```
 
 프로덕션 빌드 확인:
 
 ```bash
 npm run build
-npm start          # 빌드 결과와 API를 함께 제공
 npm run test:api
 npm run qa:ui
 ```
 
-## 서버 환경변수
-
-`.env.example`을 `.env`로 복사하고 값을 채웁니다. API 키는 브라우저 번들이나 API 응답에
-노출되지 않습니다.
-
-```bash
-GEMINI_API_KEY=...
-GEMINI_IMAGE_MODEL=gemini-3.1-flash-image
-GEMINI_COPY_MODEL=gemini-3.1-flash-lite
-COUPANG_PARTNERS_ACCESS_KEY=...
-COUPANG_PARTNERS_SECRET_KEY=...
-```
-
-키가 없을 때는 업로드·캠페인 저장·데모 흐름은 정상 동작하고, Gemini 생성 버튼만 비활성화됩니다.
-
 ## GitHub Pages 배포
 
 `main` 브랜치에 push하면 `.github/workflows/pages.yml`이 GitHub Pages용 프론트엔드를
-빌드하고 배포합니다. 빌드에는 비밀값이 아닌 API 주소만 포함되며, Gemini 키는 맥미니
-Keychain에만 저장됩니다. API가 일시적으로 연결되지 않으면 사용자에게 오류를 표시합니다.
+빌드하고 배포합니다. 워크플로는 `VITE_STATIC_DEPLOYMENT=true`만 설정하며 API 주소나 비밀값을
+주입하지 않습니다. 정적 빌드에서는 환경에 오래된 API 주소가 남아 있어도 무시합니다.
 
-새 Gemini 키는 채팅이나 파일에 붙여넣지 않고 맥미니 터미널에서 다음 스크립트로 숨김 입력합니다.
+## 실험용 백엔드
 
-```bash
-./scripts/install-gemini-key.sh
-```
-
-스크립트는 키를 `fitloop-gemini-api-key`라는 macOS Keychain 항목으로 저장하고 API 서비스를
-재시작합니다. 공개된 적이 있는 키는 먼저 Google AI Studio에서 폐기한 뒤 새 키를 사용합니다.
-
-쿠팡 링크 지원은 쿠팡의 서버 자동 접근 차단 때문에 공식 파트너스 API를 사용합니다. 파트너스에서
-발급한 Access Key와 Secret Key는 채팅에 올리지 말고 맥미니에서 아래 스크립트로 저장합니다.
-
-```bash
-./scripts/install-coupang-keys.sh
-```
-
-## 백엔드 API
+`server.mjs`와 API 테스트는 개발 기록 및 로컬 실험용으로 보존합니다. 공개 GitHub Pages 사이트는
+아래 엔드포인트에 연결하지 않습니다.
 
 - `GET /api/health` — 서버 및 Gemini 설정 상태
 - `POST /api/products` — 파일 업로드 또는 공개 URL의 상품 이미지 저장
@@ -94,7 +64,7 @@ Open Graph, Product JSON-LD, Twitter Card, 동적 스크립트, 대표/지연 �
 1. **상품 입력** — 구매 페이지 URL 또는 상품 이미지 → 대표 이미지·상품명·가격 준비
 2. **타겟·예산** — 일 예산 슬라이더(1~5만 원) · 성별·연령 타겟 · 채널 토글
 3. **모델 선택** — 성별·나이대·피부색·인종·체형 필터 · Fliption 가상 모델 최대 4명 선택
-4. **광고 시안 생성** — 포즈/모델 4슬롯 × 배경 3종 = 12개, 카피 자동 작성 후 이미지 12개 동시 생성
+4. **예시 광고 시안** — 포즈/모델 4슬롯 × 배경 3종 = 미리 준비된 정적 이미지 12개
 5. **성과 대시보드** — 7일 타임랩스 재생: KPI 타일 / ROAS 추이 차트 / 시안별 예산 배분 /
    시안 현황 미니뷰 / 이번 주 성적표
 

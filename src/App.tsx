@@ -5,6 +5,7 @@ import Step2Creatives from './screens/Step2Creatives.tsx'
 import Step3Campaign, { type CampaignSettings } from './screens/Step3Campaign.tsx'
 import Step3Models from './screens/Step3Models.tsx'
 import Step4Dashboard from './screens/Step4Dashboard.tsx'
+import Home from './screens/Home.tsx'
 import { getHealth, saveCampaign } from './lib/api.ts'
 import {
   applyModelProfiles,
@@ -21,19 +22,21 @@ import {
 } from './lib/models.ts'
 import { DEMO_PRODUCT, type BackendHealth, type GeneratedCreative, type ProductRecord } from './lib/types.ts'
 
-function Logo() {
+function Logo({ compact = false }: { compact?: boolean }) {
   return (
-    <span className="text-[19px] font-bold tracking-tight">
+    <span className={`${compact ? 'text-[19px]' : 'text-[20px]'} font-bold tracking-tight`}>
       FitL<span className="text-brand">oo</span>p
     </span>
   )
 }
 
 // 발표 리허설용: ?step=5 처럼 특정 단계로 바로 진입 가능
+const initialQuery = new URLSearchParams(window.location.search)
 const initialStep = (() => {
-  const n = Number(new URLSearchParams(window.location.search).get('step'))
+  const n = Number(initialQuery.get('step'))
   return Number.isInteger(n) && n >= 1 && n <= 5 ? n : 1
 })()
+const initialPage = initialQuery.has('demo') || initialQuery.has('step') ? 'demo' : 'home'
 
 function productGender(product: ProductRecord): '여성' | '남성' | null {
   const text = `${product.name} ${product.category}`.toLowerCase()
@@ -43,6 +46,7 @@ function productGender(product: ProductRecord): '여성' | '남성' | null {
 }
 
 export default function App() {
+  const [page, setPage] = useState<'home' | 'demo'>(initialPage)
   const [step, setStep] = useState(initialStep)
   const [maxReached, setMaxReached] = useState(initialStep)
   const [product, setProduct] = useState<ProductRecord | null>(initialStep > 1 ? DEMO_PRODUCT : null)
@@ -60,8 +64,24 @@ export default function App() {
   })
 
   const go = (next: number) => {
+    setPage('demo')
     setStep(next)
     setMaxReached((m) => Math.max(m, next))
+    window.history.replaceState(null, '', `?demo=1&step=${next}`)
+    window.scrollTo({ top: 0 })
+  }
+
+  const startDemo = () => {
+    setPage('demo')
+    setStep(1)
+    setMaxReached(1)
+    window.history.replaceState(null, '', '?demo=1')
+    window.scrollTo({ top: 0 })
+  }
+
+  const showHome = () => {
+    setPage('home')
+    window.history.replaceState(null, '', window.location.pathname)
     window.scrollTo({ top: 0 })
   }
 
@@ -126,66 +146,82 @@ export default function App() {
     <div className="flex min-h-screen flex-col">
       {/* 헤더 */}
       <header className="sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5">
-          <div className="flex items-center gap-2.5">
-            <Logo />
+        <div className={`mx-auto flex h-16 items-center justify-between gap-4 px-5 ${page === 'home' ? 'max-w-7xl' : 'max-w-6xl'}`}>
+          <button type="button" onClick={showHome} className="flex cursor-pointer items-center gap-2.5 text-left" aria-label="FitLoop 홈">
+            <Logo compact={page === 'demo'} />
             <span className="hidden rounded-full border border-line bg-gray-50 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-sub sm:inline-flex">
-              AI PERFORMANCE MARKETING
+              {page === 'home' ? 'PROJECT PORTFOLIO' : 'INTERACTIVE DEMO'}
             </span>
-          </div>
-          <StepIndicator current={step} maxReached={maxReached} onSelect={go} />
-          <span className="hidden w-[154px] text-right text-xs md:block">
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 ${health ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-faint'}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${health ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-              {health
-                ? health.deployment === 'static'
-                  ? '서비스 준비 완료'
-                  : health.geminiConfigured
-                    ? '서버 · Gemini 준비'
-                    : '서버 연결됨'
-                : '환경 확인 중'}
-            </span>
-          </span>
+          </button>
+          {page === 'home' ? (
+            <nav className="flex items-center gap-1 text-xs font-medium sm:gap-5 sm:text-sm" aria-label="메인 탐색">
+              <a href="#project" className="hidden text-sub transition-colors hover:text-ink sm:inline">프로젝트</a>
+              <a href="#presentations" className="hidden text-sub transition-colors hover:text-ink sm:inline">발표자료</a>
+              <button type="button" onClick={startDemo} className="cursor-pointer rounded-full bg-ink px-4 py-2.5 font-semibold text-white transition-colors hover:bg-gray-800">
+                데모 체험
+              </button>
+            </nav>
+          ) : (
+            <>
+              <StepIndicator current={step} maxReached={maxReached} onSelect={go} />
+              <span className="hidden w-[154px] text-right text-xs md:block">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-blue-800">
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  정적 데모 모드
+                </span>
+              </span>
+            </>
+          )}
         </div>
       </header>
 
       {/* 본문 */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-5">
-        {step === 1 && (
-          <Step1Product
-            product={product}
-            onProduct={handleProduct}
-            onNext={() => go(2)}
-          />
-        )}
-        {step === 2 && product && (
-          <Step3Campaign settings={settings} onChange={setSettings} onNext={continueToModels} />
-        )}
-        {step === 3 && product && (
-          <Step3Models
-            selection={modelSelection}
-            onChange={setModelSelection}
-            selectedIds={modelIds}
-            onSelect={setModelIds}
-            onNext={startCreativeGeneration}
-          />
-        )}
-        {step === 4 && product && (
-          <Step2Creatives
-            product={product}
-            health={health}
-            generated={generated}
-            autoGenerate={autoGenerateCreatives}
-            onAutoGenerateStarted={() => setAutoGenerateCreatives(false)}
-            onGenerated={handleGenerated}
-            onNext={() => void launchCampaign()}
-          />
-        )}
-        {step === 5 && (
-          <>
-            {notice && <p className="mx-auto mt-5 max-w-3xl rounded-2xl bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-800">{notice}</p>}
-            <Step4Dashboard dailyBudget={settings.dailyBudget} generated={generated} />
-          </>
+      <main className="w-full flex-1">
+        {page === 'home' ? (
+          <Home onStartDemo={startDemo} />
+        ) : (
+          <div className="mx-auto w-full max-w-7xl px-5">
+            <div className="mx-auto mt-5 flex max-w-3xl items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-xs leading-5 text-blue-900 sm:items-center sm:justify-center sm:text-center">
+              <span className="mt-0.5 shrink-0 sm:mt-0">ⓘ</span>
+              <span>포트폴리오용 정적 데모입니다. 외부 이미지 생성 API 없이 미리 준비된 예시 이미지로 전체 흐름을 보여줍니다.</span>
+            </div>
+            {step === 1 && (
+              <Step1Product
+                product={product}
+                onProduct={handleProduct}
+                onNext={() => go(2)}
+              />
+            )}
+            {step === 2 && product && (
+              <Step3Campaign settings={settings} onChange={setSettings} onNext={continueToModels} />
+            )}
+            {step === 3 && product && (
+              <Step3Models
+                selection={modelSelection}
+                onChange={setModelSelection}
+                selectedIds={modelIds}
+                onSelect={setModelIds}
+                onNext={startCreativeGeneration}
+              />
+            )}
+            {step === 4 && product && (
+              <Step2Creatives
+                product={product}
+                health={health}
+                generated={generated}
+                autoGenerate={autoGenerateCreatives}
+                onAutoGenerateStarted={() => setAutoGenerateCreatives(false)}
+                onGenerated={handleGenerated}
+                onNext={() => void launchCampaign()}
+              />
+            )}
+            {step === 5 && (
+              <>
+                {notice && <p className="mx-auto mt-5 max-w-3xl rounded-2xl bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-800">{notice}</p>}
+                <Step4Dashboard dailyBudget={settings.dailyBudget} generated={generated} />
+              </>
+            )}
+          </div>
         )}
       </main>
 
@@ -194,7 +230,7 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-7 sm:flex-row">
           <div className="flex items-center gap-3">
             <Logo />
-            <span className="text-xs text-faint">사진 한 장에서 매출까지, 루프를 돌립니다.</span>
+            <span className="text-xs text-faint">사진 한 장에서 성과 검증까지, 루프를 돌립니다.</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-sub">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
@@ -205,7 +241,7 @@ export default function App() {
                 strokeLinecap="round"
               />
             </svg>
-            <span className="font-medium">Powered by Fliption Virtual Try-on</span>
+            <span className="font-medium">ICISTS GRAFFITI 2026 · Team 13</span>
           </div>
         </div>
       </footer>

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 
-const baseUrl = process.env.FITLOOP_DEMO_URL || 'https://fitloop-demo.jaeyeong2026.com'
+const baseUrl = process.env.FITLOOP_DEMO_URL || 'https://fitloop.jaeyeong2026.com'
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 const errors = []
@@ -13,6 +13,8 @@ page.on('console', (message) => {
 try {
   const response = await page.goto(baseUrl, { waitUntil: 'networkidle' })
   assert.equal(response?.status(), 200)
+  await page.getByRole('heading', { name: /광고 이미지를 만들고/ }).waitFor()
+  await page.getByRole('button', { name: '데모 체험' }).click()
   await page.getByRole('heading', { name: /옷 사진 한 장이면/ }).waitFor()
   await page.getByPlaceholder(/상품 URL/).fill('https://www.musinsa.com/products/4672509')
   await page.getByRole('button', { name: '가져오기' }).click()
@@ -21,7 +23,7 @@ try {
   await page.getByRole('button', { name: /모델 고르러 가기/ }).click()
   await page.getByText('4/4명 선택됨').waitFor()
   await page.getByRole('button', { name: /시안 12종 만들기/ }).click()
-  await page.getByRole('heading', { name: /광고 시안 12종/ }).waitFor()
+  await page.getByRole('heading', { name: /예시 광고 시안 12종/ }).waitFor()
   assert.equal(await page.locator('img[src*="/creatives/"]').count(), 12)
   await page.getByRole('button', { name: /이 시안으로 광고 시작하기/ }).click()
   await page.getByRole('heading', { name: '성과 대시보드' }).waitFor()

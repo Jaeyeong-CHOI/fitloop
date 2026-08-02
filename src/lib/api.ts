@@ -13,8 +13,12 @@ interface ApiErrorBody {
 }
 
 const STATIC_DEPLOYMENT = import.meta.env.VITE_STATIC_DEPLOYMENT === 'true'
-const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-const STATIC_FALLBACK = STATIC_DEPLOYMENT && !API_BASE_URL
+// A Pages build must never call the former image-generation backend, even if a
+// stale VITE_API_BASE_URL exists in a runner or local shell.
+const API_BASE_URL = STATIC_DEPLOYMENT
+  ? ''
+  : String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+const STATIC_FALLBACK = STATIC_DEPLOYMENT
 
 function localId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
