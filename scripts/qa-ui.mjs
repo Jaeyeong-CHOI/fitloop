@@ -9,6 +9,19 @@ await mkdir(outputDir, { recursive: true })
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const errors = []
 const unexpectedApiRequests = []
+const blockedThirdPartyScripts = []
+
+function captureConsoleError(message, label) {
+  const text = message.text()
+  if (
+    text.includes('static.cloudflareinsights.com/beacon.min.js') &&
+    text.includes('violates the following Content Security Policy')
+  ) {
+    blockedThirdPartyScripts.push(`${label}: Cloudflare Insights blocked by CSP`)
+    return
+  }
+  errors.push(`${label}: ${text}`)
+}
 
 async function assertNoHorizontalOverflow(page, label) {
   const overflow = await page.evaluate(
@@ -25,7 +38,7 @@ try {
     const page = await browser.newPage({ viewport })
     page.on('pageerror', (error) => errors.push(`${viewport.name}: ${error.message}`))
     page.on('console', (message) => {
-      if (message.type() === 'error') errors.push(`${viewport.name}: ${message.text()}`)
+      if (message.type() === 'error') captureConsoleError(message, viewport.name)
     })
     page.on('request', (request) => {
       const url = request.url()
@@ -181,7 +194,7 @@ try {
 
   byokPage.on('pageerror', (error) => errors.push(`byok: ${error.message}`))
   byokPage.on('console', (message) => {
-    if (message.type() === 'error') errors.push(`byok: ${message.text()}`)
+    if (message.type() === 'error') captureConsoleError(message, 'byok')
   })
   byokPage.on('request', (request) => {
     if (request.url().includes('generativelanguage.googleapis.com')) return
@@ -250,6 +263,9 @@ try {
   console.log(`Portfolio fallback QA passed: ${baseUrl}`)
   console.log(`Browser BYOK QA passed: 1 validation, 1 copy, 12 images, max concurrency ${maxActiveImages}`)
   console.log(`No API requests observed without a browser key`)
+  if (blockedThirdPartyScripts.length) {
+    console.log(`CSP blocked ${blockedThirdPartyScripts.length} Cloudflare Insights script injection(s)`)
+  }
   console.log(`Screenshots: ${outputDir}`)
 } finally {
   await browser.close()
