@@ -38,9 +38,17 @@ try {
     assert.equal(response?.status(), 200)
     await page.getByRole('heading', { name: /광고 이미지를 만들고/ }).waitFor()
     await page.getByRole('heading', { name: '발표 자료' }).waitFor()
-    assert.equal(await page.locator('a[href*="1UOGJYSpfCsh4xOfomOjYhEwiagRyYfKU"]').count(), 1)
-    assert.equal(await page.locator('a[href*="1k1WqSfDgRtHlcvq_XQFge2MrCB6QbBw1"]').count(), 1)
+    assert.equal(await page.locator('a[href="/presentations/fitloop-presentation.pdf"]').count(), 1)
+    assert.equal(await page.locator('a[href="/presentations/fitloop-a2-poster.pdf"]').count(), 1)
     assert.equal(await page.locator('img[src*="/presentations/"]').count(), 2)
+    for (const asset of [
+      '/presentations/fitloop-presentation.pdf',
+      '/presentations/fitloop-a2-poster.pdf',
+    ]) {
+      const pdfResponse = await page.request.get(new URL(asset, baseUrl).href)
+      assert.equal(pdfResponse.status(), 200)
+      assert.match(pdfResponse.headers()['content-type'] || '', /application\/pdf/)
+    }
     await assertNoHorizontalOverflow(page, `${viewport.name} portfolio`)
     await page.screenshot({ path: `${outputDir}/${viewport.name}-portfolio.png`, fullPage: true })
 

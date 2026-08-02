@@ -2,10 +2,8 @@ interface Props {
   onStartDemo: () => void
 }
 
-const DECK_URL =
-  'https://drive.google.com/file/d/1UOGJYSpfCsh4xOfomOjYhEwiagRyYfKU/view?usp=sharing'
-const POSTER_URL =
-  'https://drive.google.com/file/d/1k1WqSfDgRtHlcvq_XQFge2MrCB6QbBw1/view?usp=sharing'
+const DECK_URL = '/presentations/fitloop-presentation.pdf'
+const POSTER_URL = '/presentations/fitloop-a2-poster.pdf'
 
 const proofPoints = [
   {
