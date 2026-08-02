@@ -16,6 +16,7 @@ interface Props {
   selectedIds: string[]
   onSelect: (ids: string[]) => void
   onNext: () => void
+  apiEnabled: boolean
 }
 
 function AttributeChips({ model }: { model: LibraryModel }) {
@@ -36,6 +37,7 @@ export default function Step3Models({
   selectedIds,
   onSelect,
   onNext,
+  apiEnabled,
 }: Props) {
   const visible = filterLibrary(selection)
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({})
@@ -169,16 +171,21 @@ export default function Step3Models({
       </div>
 
       <div className="mt-8 flex justify-center pb-4">
-        <button
-          type="button"
-          disabled={!selectedIds.length}
-          onClick={onNext}
-          className="cursor-pointer rounded-full bg-brand px-10 py-4 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:bg-gray-200 disabled:text-faint disabled:shadow-none"
-        >
-          {selectedIds.length === 1
-            ? `이 모델로 시안 ${CREATIVES.length}종 만들기 →`
-            : `이 모델 ${selectedIds.length}명으로 시안 ${CREATIVES.length}종 만들기 →`}
-        </button>
+        <div className="text-center">
+          {apiEnabled && <p className="mb-3 text-xs font-medium text-amber-700">Gemini 이미지 {CREATIVES.length}장 생성 비용이 발생합니다.</p>}
+          <button
+            type="button"
+            disabled={!selectedIds.length}
+            onClick={onNext}
+            className="cursor-pointer rounded-full bg-brand px-10 py-4 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:bg-gray-200 disabled:text-faint disabled:shadow-none"
+          >
+            {apiEnabled
+              ? `Nano Banana로 시안 ${CREATIVES.length}종 생성 →`
+              : selectedIds.length === 1
+                ? `이 모델로 예시 시안 ${CREATIVES.length}종 보기 →`
+                : `이 모델 ${selectedIds.length}명으로 예시 시안 ${CREATIVES.length}종 보기 →`}
+          </button>
+        </div>
       </div>
     </div>
   )

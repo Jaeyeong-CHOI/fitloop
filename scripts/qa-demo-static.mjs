@@ -22,7 +22,7 @@ try {
   await page.getByRole('button', { name: /예산과 타겟 정하러 가기/ }).click()
   await page.getByRole('button', { name: /모델 고르러 가기/ }).click()
   await page.getByText('4/4명 선택됨').waitFor()
-  await page.getByRole('button', { name: /시안 12종 만들기/ }).click()
+  await page.getByRole('button', { name: /예시 시안 12종 보기/ }).click()
   await page.getByRole('heading', { name: /예시 광고 시안 12종/ }).waitFor()
   assert.equal(await page.locator('img[src*="/creatives/"]').count(), 12)
   await page.getByRole('button', { name: /이 시안으로 광고 시작하기/ }).click()
@@ -30,7 +30,7 @@ try {
   await page.getByRole('button', { name: '7일 재생' }).click()
   await page.getByText('Day 2', { exact: true }).waitFor({ timeout: 3_500 })
   assert.deepEqual(errors, [])
-  console.log(`Static demo QA passed: ${baseUrl}`)
+  console.log(`No-key fallback demo QA passed: ${baseUrl}`)
 } finally {
   await page.close()
   await browser.close()

@@ -9,16 +9,18 @@ import {
 } from '../lib/creatives.ts'
 import type { BackendHealth, GeneratedCreative, ProductRecord } from '../lib/types.ts'
 
-const PARALLEL_GENERATION_COUNT = 12
+const PARALLEL_GENERATION_COUNT = 4
 
 interface Props {
   product: ProductRecord
   health: BackendHealth | null
   generated: Record<string, GeneratedCreative>
   autoGenerate: boolean
+  apiKey: string
   onAutoGenerateStarted: () => void
   onGenerated: (creative: GeneratedCreative) => void
   onNext: () => void
+  onRequestApiKey: () => void
 }
 
 export default function Step2Creatives({
@@ -26,9 +28,11 @@ export default function Step2Creatives({
   health,
   generated,
   autoGenerate,
+  apiKey,
   onAutoGenerateStarted,
   onGenerated,
   onNext,
+  onRequestApiKey,
 }: Props) {
   const [revealed, setRevealed] = useState(0)
   const [working, setWorking] = useState<Set<string>>(new Set())
@@ -46,7 +50,7 @@ export default function Step2Creatives({
     return () => window.clearTimeout(timer)
   }, [revealed])
 
-  const canGenerate = product.id !== 'demo' && Boolean(health?.geminiConfigured)
+  const canGenerate = Boolean(apiKey && health?.geminiConfigured && product.imageUrl)
 
   const createOne = async (creative: Creative, showError = true) => {
     if (!canGenerate || workingIds.current.has(creative.id)) return false
@@ -56,13 +60,14 @@ export default function Step2Creatives({
     try {
       const result = await generateCreative({
         productId: product.id,
+        productImageUrl: product.imageUrl || '',
         creativeId: creative.id,
         productName: product.name,
         modelLabel: creative.model.label,
         poseLabel: posePrompt(creative),
         backgroundLabel: creative.background.label,
         copyText: creative.copy.text,
-      })
+      }, apiKey)
       onGenerated(result)
       return true
     } catch (reason) {
@@ -89,13 +94,16 @@ export default function Step2Creatives({
     const copyPromise = generateCopies({
       productId: product.id,
       productName: product.name,
+      category: product.category,
+      color: product.color,
+      fit: product.fit,
       combinations: CREATIVES.map((creative) => ({
         creativeId: creative.id,
         modelLabel: creative.model.label,
         poseLabel: posePrompt(creative),
         backgroundLabel: creative.background.label,
       })),
-    })
+    }, apiKey)
       .then((result) => {
         applyCreativeCopies(
           Object.fromEntries(result.copies.map((copy) => [copy.creativeId, copy.text])),
@@ -141,7 +149,7 @@ export default function Step2Creatives({
 
   const generatedCount = Object.keys(generated).length
   const allGenerated = generatedCount >= CREATIVES.length
-  const staticReady = health?.deployment === 'static'
+  const staticReady = !health?.geminiConfigured
 
   return (
     <div className="animate-fade-in mx-auto max-w-6xl pt-8 pb-6">
@@ -160,8 +168,8 @@ export default function Step2Creatives({
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed break-keep text-sub">
             {staticReady
-              ? '포즈 4종 × 배경 3종으로 구성한 정적 데모 이미지입니다. 각 조합의 성과가 어떻게 달라지는지 다음 단계에서 확인할 수 있습니다.'
-              : `포즈 4종 × 배경 3종을 조합하고, 상품에 맞는 광고 카피도 AI가 자동 작성합니다. 이미지 ${CREATIVES.length}개는 동시에 초고속 병렬 생성됩니다.`}
+              ? 'API 키를 연결하지 않은 상태라 미리 준비된 포즈 4종 × 배경 3종의 예시 이미지를 보여드립니다.'
+              : `Nano Banana 2가 포즈 4종 × 배경 3종을 만들고, 상품에 맞는 카피도 작성합니다. 최대 ${PARALLEL_GENERATION_COUNT}개씩 병렬 생성합니다.`}
           </p>
         </div>
         {staticReady ? (
@@ -193,11 +201,18 @@ export default function Step2Creatives({
             ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
             : 'border-amber-200 bg-amber-50 text-amber-900'
         }`}>
-          {product.id === 'demo'
-            ? '상품 분석 결과를 바탕으로 포즈 4종 × 배경 3종의 광고 시안 12종을 구성했습니다.'
-            : staticReady
-              ? '외부 이미지 생성 API를 호출하지 않고, 미리 준비된 예시 광고 시안 12종을 보여드립니다.'
-              : '이미지 생성 서버가 연결되면 AI 생성 버튼이 활성화됩니다. 현재 시안으로 캠페인을 계속 구성할 수 있습니다.'}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {staticReady
+                ? 'Gemini API 키를 연결하면 이 상품 이미지로 실제 광고 시안 12종을 생성할 수 있습니다. 연결하지 않아도 예시 데모는 계속 진행됩니다.'
+                : '상품 이미지를 준비하면 Gemini 생성 버튼이 활성화됩니다.'}
+            </span>
+            {staticReady && (
+              <button type="button" onClick={onRequestApiKey} className="shrink-0 cursor-pointer rounded-full bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-800">
+                API 키 연결
+              </button>
+            )}
+          </div>
         </div>
       )}
       {error && <p role="alert" className="mb-6 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
@@ -236,9 +251,9 @@ export default function Step2Creatives({
 
       <div className="mt-9 flex flex-col items-center gap-3 pb-4">
         <p className="text-xs text-faint">
-          {health?.deployment === 'static'
-            ? '정적 데모의 캠페인 설정은 이 브라우저에만 임시 저장됩니다.'
-            : '생성된 시안과 캠페인 설정은 서버에 저장됩니다.'}
+          {health?.deployment === 'browser'
+            ? '생성 결과는 현재 탭에만 유지되며 API 키와 캠페인 설정은 이 브라우저에 저장됩니다.'
+            : '예시 데모의 캠페인 설정은 이 브라우저에만 임시 저장됩니다.'}
         </p>
         <button type="button" onClick={onNext} disabled={revealed < CREATIVES.length || batchProgress !== null} className="cursor-pointer rounded-full bg-brand px-8 py-3.5 text-[15px] font-semibold text-white shadow-soft transition-all hover:bg-brand-deep disabled:cursor-default disabled:opacity-40">
           이 시안으로 광고 시작하기 →

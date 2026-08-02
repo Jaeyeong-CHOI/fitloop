@@ -17,7 +17,7 @@ export interface BackendHealth {
   copyModel?: string
   generationLimit?: number | null
   persistence: boolean
-  deployment?: 'server' | 'static'
+  deployment?: 'server' | 'static' | 'browser'
 }
 
 export interface GeneratedCreative {

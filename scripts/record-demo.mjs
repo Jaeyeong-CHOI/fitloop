@@ -143,7 +143,7 @@ await pause(2_400)
 await caption('브랜드 타겟에 맞는 가상 모델 네 명을 선택합니다.')
 await page.getByText('4/4명 선택됨').waitFor()
 await pause(2_800)
-await click(page.getByRole('button', { name: /이 모델 4명으로 시안 12종 만들기/ }), 1_500)
+await click(page.getByRole('button', { name: /예시 시안 12종 보기/ }), 1_500)
 
 await caption('포즈 4종 × 배경 3종, 총 12개 광고 시안을 동시에 만듭니다.')
 await page.getByRole('heading', { name: /광고 시안/ }).waitFor()

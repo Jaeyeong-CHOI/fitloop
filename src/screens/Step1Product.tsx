@@ -91,7 +91,7 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
                 disabled={phase === 'analyzing'}
-                placeholder="쿠팡·무신사·스마트스토어 상품 URL"
+                placeholder="상품 URL로 예시 흐름 체험"
                 className="h-12 min-w-0 flex-1 rounded-full border border-line bg-white px-5 text-sm outline-none placeholder:text-faint focus:border-brand focus:ring-2 focus:ring-brand/15"
               />
               <button
@@ -103,7 +103,7 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
               </button>
             </form>
             <p className="mt-2 px-2 text-left text-[11px] text-faint">
-              링크를 붙여넣으면 대표 이미지·상품명·가격을 자동으로 가져옵니다.
+              URL 입력은 포트폴리오 예시 상품으로 진행됩니다. 실제 Gemini 생성에는 아래에서 상품 사진을 업로드하세요.
             </p>
 
             <div className="my-5 flex items-center gap-3 text-xs text-faint">

@@ -160,7 +160,7 @@ export default function Home({ onStartDemo }: Props) {
               <p className="text-[11px] font-semibold tracking-[0.18em] text-orange-400">AUTOMATED LOOP</p>
               <h3 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">사람은 승인만, 나머지는 도는 구조</h3>
             </div>
-            <span className="text-xs text-blue-200">정적 포트폴리오 데모로 전체 흐름 체험 가능</span>
+            <span className="text-xs text-blue-200">예시 데모 또는 브라우저 BYOK 실생성으로 체험 가능</span>
           </div>
           <ol className="mt-9 grid gap-px overflow-hidden rounded-2xl bg-white/15 sm:grid-cols-2 lg:grid-cols-4">
             {loopSteps.map(([number, title, description], index) => (
@@ -258,7 +258,7 @@ export default function Home({ onStartDemo }: Props) {
             <h2 className="mt-4 max-w-2xl text-3xl leading-tight font-bold tracking-tight break-keep sm:text-5xl">
               제품 사진부터 7일 성과 리포트까지 직접 확인해 보세요.
             </h2>
-            <p className="mt-5 text-sm text-sub">외부 AI API를 호출하지 않는 정적 데모입니다. 모든 예시는 미리 준비된 이미지로 동작합니다.</p>
+            <p className="mt-5 text-sm text-sub">API 키 없이 예시 이미지로 둘러보거나, 개인 Gemini 키를 브라우저에 연결해 실제 시안을 생성할 수 있습니다.</p>
           </div>
           <button
             type="button"

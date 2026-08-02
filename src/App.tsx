@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import ApiKeyDialog from './components/ApiKeyDialog.tsx'
 import StepIndicator from './components/StepIndicator.tsx'
 import Step1Product from './screens/Step1Product.tsx'
 import Step2Creatives from './screens/Step2Creatives.tsx'
@@ -8,7 +9,13 @@ import Step4Dashboard from './screens/Step4Dashboard.tsx'
 import Home from './screens/Home.tsx'
 import { getHealth, saveCampaign } from './lib/api.ts'
 import {
+  clearBrowserApiKey,
+  readBrowserApiKey,
+  saveBrowserApiKey,
+} from './lib/browser-key.ts'
+import {
   applyModelProfiles,
+  CREATIVES,
   creativeCopyMap,
   resetCreativeCopies,
 } from './lib/creatives.ts'
@@ -47,6 +54,8 @@ function productGender(product: ProductRecord): '여성' | '남성' | null {
 
 export default function App() {
   const [page, setPage] = useState<'home' | 'demo'>(initialPage)
+  const [apiKey, setApiKey] = useState(readBrowserApiKey)
+  const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
   const [step, setStep] = useState(initialStep)
   const [maxReached, setMaxReached] = useState(initialStep)
   const [product, setProduct] = useState<ProductRecord | null>(initialStep > 1 ? DEMO_PRODUCT : null)
@@ -86,8 +95,22 @@ export default function App() {
   }
 
   useEffect(() => {
-    getHealth().then(setHealth).catch(() => setHealth(null))
-  }, [])
+    getHealth(apiKey).then(setHealth).catch(() => setHealth(null))
+  }, [apiKey])
+
+  const closeApiKeyDialog = useCallback(() => setApiKeyDialogOpen(false), [])
+
+  const handleApiKeySave = (key: string) => {
+    setApiKey(saveBrowserApiKey(key))
+    setGenerated({})
+  }
+
+  const handleApiKeyClear = () => {
+    clearBrowserApiKey()
+    setApiKey('')
+    setGenerated({})
+    setAutoGenerateCreatives(false)
+  }
 
   const handleGenerated = (creative: GeneratedCreative) => {
     setGenerated((current) => ({ ...current, [creative.creativeId]: creative }))
@@ -115,6 +138,14 @@ export default function App() {
   }
 
   const startCreativeGeneration = () => {
+    if (
+      apiKey &&
+      !window.confirm(
+        `Gemini API로 이미지 ${CREATIVES.length}장을 생성합니다. 사용 중인 Google 프로젝트에 API 비용이 청구될 수 있습니다. 계속할까요?`,
+      )
+    ) {
+      return
+    }
     applyModelProfiles(slotLabels(modelIds))
     resetCreativeCopies()
     setGenerated({})
@@ -131,9 +162,9 @@ export default function App() {
           generatedCreativeIds: Object.values(generated).map((creative) => creative.id),
         })
         setNotice(
-          health?.deployment === 'static'
-            ? '캠페인이 시작되었습니다. 7일 성과 예측을 확인하세요.'
-            : `캠페인 ${campaign.id.slice(0, 8)}가 서버에 저장됐습니다.`,
+          health?.deployment === 'server'
+            ? `캠페인 ${campaign.id.slice(0, 8)}가 서버에 저장됐습니다.`
+            : '캠페인 설정이 이 브라우저에 저장됐습니다. 7일 성과 예측을 확인하세요.',
         )
       } catch {
         setNotice('캠페인 저장을 완료하지 못했습니다. 성과 예측 화면은 계속 확인할 수 있습니다.')
@@ -157,6 +188,9 @@ export default function App() {
             <nav className="flex items-center gap-1 text-xs font-medium sm:gap-5 sm:text-sm" aria-label="메인 탐색">
               <a href="#project" className="hidden text-sub transition-colors hover:text-ink sm:inline">프로젝트</a>
               <a href="#presentations" className="hidden text-sub transition-colors hover:text-ink sm:inline">발표자료</a>
+              <button type="button" onClick={() => setApiKeyDialogOpen(true)} className={`hidden cursor-pointer rounded-full border px-4 py-2.5 font-semibold transition-colors sm:inline-flex ${apiKey ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'border-line bg-white text-sub hover:border-gray-300 hover:text-ink'}`}>
+                {apiKey ? 'API 연결됨' : 'API 키 연결'}
+              </button>
               <button type="button" onClick={startDemo} className="cursor-pointer rounded-full bg-ink px-4 py-2.5 font-semibold text-white transition-colors hover:bg-gray-800">
                 데모 체험
               </button>
@@ -164,12 +198,12 @@ export default function App() {
           ) : (
             <>
               <StepIndicator current={step} maxReached={maxReached} onSelect={go} />
-              <span className="hidden w-[154px] text-right text-xs md:block">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-blue-800">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  정적 데모 모드
+              <button type="button" onClick={() => setApiKeyDialogOpen(true)} className={`hidden w-[154px] cursor-pointer justify-end text-right text-xs md:flex`}>
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 ${apiKey ? 'bg-emerald-50 text-emerald-800' : 'bg-blue-50 text-blue-800'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${apiKey ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                  {apiKey ? 'Nano Banana 연결됨' : '예시 데모 모드'}
                 </span>
-              </span>
+              </button>
             </>
           )}
         </div>
@@ -181,9 +215,18 @@ export default function App() {
           <Home onStartDemo={startDemo} />
         ) : (
           <div className="mx-auto w-full max-w-7xl px-5">
-            <div className="mx-auto mt-5 flex max-w-3xl items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-xs leading-5 text-blue-900 sm:items-center sm:justify-center sm:text-center">
-              <span className="mt-0.5 shrink-0 sm:mt-0">ⓘ</span>
-              <span>포트폴리오용 정적 데모입니다. 외부 이미지 생성 API 없이 미리 준비된 예시 이미지로 전체 흐름을 보여줍니다.</span>
+            <div className={`mx-auto mt-5 flex max-w-3xl flex-col gap-3 rounded-2xl border px-4 py-3 text-xs leading-5 sm:flex-row sm:items-center sm:justify-between ${apiKey ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-blue-100 bg-blue-50/80 text-blue-900'}`}>
+              <span className="flex items-start gap-2 sm:items-center">
+                <span className="mt-0.5 shrink-0 sm:mt-0">{apiKey ? '✓' : 'ⓘ'}</span>
+                <span>
+                  {apiKey
+                    ? 'Nano Banana 2가 연결됐습니다. 요청은 이 브라우저에서 Google Gemini API로 직접 전송됩니다.'
+                    : 'API 키를 연결하지 않으면 미리 준비된 예시 이미지로 전체 흐름을 체험할 수 있습니다.'}
+                </span>
+              </span>
+              <button type="button" onClick={() => setApiKeyDialogOpen(true)} className={`shrink-0 cursor-pointer self-start rounded-full px-4 py-2 font-semibold text-white sm:self-auto ${apiKey ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-blue-800 hover:bg-blue-900'}`}>
+                {apiKey ? '키 관리' : 'API 키 연결'}
+              </button>
             </div>
             {step === 1 && (
               <Step1Product
@@ -202,6 +245,7 @@ export default function App() {
                 selectedIds={modelIds}
                 onSelect={setModelIds}
                 onNext={startCreativeGeneration}
+                apiEnabled={Boolean(apiKey)}
               />
             )}
             {step === 4 && product && (
@@ -210,9 +254,11 @@ export default function App() {
                 health={health}
                 generated={generated}
                 autoGenerate={autoGenerateCreatives}
+                apiKey={apiKey}
                 onAutoGenerateStarted={() => setAutoGenerateCreatives(false)}
                 onGenerated={handleGenerated}
                 onNext={() => void launchCampaign()}
+                onRequestApiKey={() => setApiKeyDialogOpen(true)}
               />
             )}
             {step === 5 && (
@@ -245,6 +291,13 @@ export default function App() {
           </div>
         </div>
       </footer>
+      <ApiKeyDialog
+        open={apiKeyDialogOpen}
+        currentKey={apiKey}
+        onClose={closeApiKeyDialog}
+        onSave={handleApiKeySave}
+        onClear={handleApiKeyClear}
+      />
     </div>
   )
 }
