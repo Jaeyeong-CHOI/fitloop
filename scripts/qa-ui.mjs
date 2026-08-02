@@ -72,7 +72,14 @@ try {
     await page.getByRole('button', { name: '데모 체험' }).click()
     await page.getByRole('heading', { name: /옷 사진 한 장이면/ }).waitFor()
     await page.getByText(/API 키를 연결하지 않으면/).waitFor()
+    await page.getByText('예시 상품이 준비됐습니다').waitFor()
+    await page.getByText('기본 예시 이미지').waitFor()
+    assert.equal(await page.getByPlaceholder(/상품 URL/).count(), 0)
+    assert.equal(await page.getByRole('button', { name: /옷 사진을/ }).count(), 0)
+    await page.getByRole('img', { name: '데일리 크롭 니트 가디건' }).waitFor()
     await assertNoHorizontalOverflow(page, `${viewport.name} demo home`)
+    await page.waitForTimeout(750)
+    await page.screenshot({ path: `${outputDir}/${viewport.name}-default-product.png`, fullPage: true })
     if (viewport.name === 'mobile') {
       await page.getByRole('button', { name: 'API 키 연결' }).first().click()
       await page.getByRole('dialog', { name: 'Gemini API 연결' }).waitFor()
@@ -81,9 +88,6 @@ try {
       await page.getByRole('button', { name: '닫기' }).click()
     }
 
-    await page.getByPlaceholder(/상품 URL/).fill('https://www.musinsa.com/products/4672509')
-    await page.getByRole('button', { name: '가져오기' }).click()
-    await page.getByText('상품 분석 완료').waitFor()
     await page.getByRole('button', { name: /예산과 타겟 정하러 가기/ }).click()
     await page.getByRole('heading', { name: /얼마로, 누구에게/ }).waitFor()
     await assertNoHorizontalOverflow(page, `${viewport.name} campaign`)
@@ -221,6 +225,7 @@ try {
 
   await byokPage.getByRole('button', { name: '데모 체험' }).click()
   await byokPage.getByText(/Nano Banana 2가 연결됐습니다/).waitFor()
+  await byokPage.getByRole('button', { name: /옷 사진을/ }).waitFor()
   await byokPage.getByPlaceholder(/상품 URL/).fill('https://example.com/product')
   await byokPage.getByRole('button', { name: '가져오기' }).click()
   await byokPage.getByText('상품 분석 완료').waitFor()

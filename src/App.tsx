@@ -58,7 +58,9 @@ export default function App() {
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
   const [step, setStep] = useState(initialStep)
   const [maxReached, setMaxReached] = useState(initialStep)
-  const [product, setProduct] = useState<ProductRecord | null>(initialStep > 1 ? DEMO_PRODUCT : null)
+  const [product, setProduct] = useState<ProductRecord | null>(() =>
+    initialStep > 1 || !readBrowserApiKey() ? DEMO_PRODUCT : null,
+  )
   const [health, setHealth] = useState<BackendHealth | null>(null)
   const [generated, setGenerated] = useState<Record<string, GeneratedCreative>>({})
   const [autoGenerateCreatives, setAutoGenerateCreatives] = useState(false)
@@ -81,6 +83,8 @@ export default function App() {
   }
 
   const startDemo = () => {
+    if (!apiKey) setProduct(DEMO_PRODUCT)
+    else if (product?.id === DEMO_PRODUCT.id) setProduct(null)
     setPage('demo')
     setStep(1)
     setMaxReached(1)
@@ -102,14 +106,17 @@ export default function App() {
 
   const handleApiKeySave = (key: string) => {
     setApiKey(saveBrowserApiKey(key))
+    if (step === 1 && product?.id === DEMO_PRODUCT.id) setProduct(null)
     setGenerated({})
   }
 
   const handleApiKeyClear = () => {
     clearBrowserApiKey()
     setApiKey('')
+    setProduct(DEMO_PRODUCT)
     setGenerated({})
     setAutoGenerateCreatives(false)
+    resetCreativeCopies()
   }
 
   const handleGenerated = (creative: GeneratedCreative) => {
@@ -230,7 +237,9 @@ export default function App() {
             </div>
             {step === 1 && (
               <Step1Product
+                key={apiKey ? 'byok-product' : 'demo-product'}
                 product={product}
+                apiEnabled={Boolean(apiKey)}
                 onProduct={handleProduct}
                 onNext={() => go(2)}
               />

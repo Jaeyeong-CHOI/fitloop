@@ -121,16 +121,12 @@ async function click(locator, after = 1_100) {
 
 await page.goto(baseUrl, { waitUntil: 'networkidle' })
 await installPresentationLayer()
-await caption('상품 URL이나 사진 한 장으로 광고 제작을 시작합니다.')
+await caption('기본 예시 상품으로 광고 제작 흐름을 바로 시작합니다.')
 await pause(3_500)
 
-const urlInput = page.getByPlaceholder(/상품 URL/)
-await moveTo(urlInput)
-await urlInput.click()
-await page.keyboard.type('https://www.musinsa.com/products/4672509', { delay: 42 })
-await pause(1_400)
-await caption('상품 페이지를 분석해 대표 이미지와 상품 정보를 자동으로 가져옵니다.')
-await click(page.getByRole('button', { name: '가져오기' }), 2_700)
+await page.getByText('예시 상품이 준비됐습니다').waitFor()
+await caption('API 키가 없어도 준비된 옷 이미지와 상품 정보로 전체 데모를 체험할 수 있습니다.')
+await pause(2_700)
 
 await caption('상품 정보가 준비되면 예산과 타겟을 정합니다.')
 await click(page.getByRole('button', { name: /예산과 타겟 정하러 가기/ }), 1_600)

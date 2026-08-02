@@ -5,13 +5,14 @@ import type { ProductRecord } from '../lib/types.ts'
 
 interface Props {
   product: ProductRecord | null
+  apiEnabled: boolean
   onProduct: (product: ProductRecord) => void
   onNext: () => void
 }
 
 type Phase = 'idle' | 'analyzing' | 'done'
 
-export default function Step1Product({ product, onProduct, onNext }: Props) {
+export default function Step1Product({ product, apiEnabled, onProduct, onNext }: Props) {
   const [phase, setPhase] = useState<Phase>(product ? 'done' : 'idle')
   const [url, setUrl] = useState('')
   const [dragOver, setDragOver] = useState(false)
@@ -82,7 +83,7 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
       </div>
 
       <div className="rounded-card border border-line bg-white p-6 shadow-soft sm:p-8">
-        {phase !== 'done' && (
+        {phase !== 'done' && apiEnabled && (
           <>
             <form onSubmit={handleUrlSubmit} className="flex gap-2">
               <input
@@ -160,14 +161,21 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
 
         {phase === 'done' && product && (
           <div className="animate-fade-up">
+            {!apiEnabled && (
+              <p className="mb-5 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
+                API 키 없이 바로 체험할 수 있도록 예시 옷 이미지를 기본으로 넣어두었습니다.
+              </p>
+            )}
             <div className="mb-4 flex items-center justify-between gap-3">
               <span className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100">✓</span>
-                상품 분석 완료
+                {apiEnabled ? '상품 분석 완료' : '예시 상품이 준비됐습니다'}
               </span>
-              <button type="button" onClick={() => setPhase('idle')} className="cursor-pointer text-xs text-faint hover:text-ink">
-                다른 상품 선택
-              </button>
+              {apiEnabled && (
+                <button type="button" onClick={() => setPhase('idle')} className="cursor-pointer text-xs text-faint hover:text-ink">
+                  다른 상품 선택
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-5">
               <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-line bg-[hsl(24_36%_90%)]">
@@ -178,6 +186,11 @@ export default function Step1Product({ product, onProduct, onNext }: Props) {
                 )}
               </div>
               <div className="min-w-0">
+                {!apiEnabled && (
+                  <span className="mb-1.5 inline-flex rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand-deep">
+                    기본 예시 이미지
+                  </span>
+                )}
                 <p className="truncate text-lg font-semibold tracking-tight">{product.name}</p>
                 <p className="mt-0.5 text-[15px] font-medium text-ink">
                   {product.price.toLocaleString('ko-KR')}<span className="text-sm font-normal text-sub">원</span>
